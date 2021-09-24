@@ -1,0 +1,159 @@
+---
+title: "Answers Question 2 numerical integration practical"
+output: html_notebook
+---
+
+
+
+```{r}
+if(!require(pacman)) {
+install.packages("pacman"); require(pacman)}
+p_load(tidyverse)
+```
+
+```{r}
+######################
+#Answer question a-b:
+######################
+
+timestep = 0.005
+maxtime  = 12
+time     = seq(0, maxtime, by = timestep)
+
+
+R0 = 350
+B0 = 1000
+f  = function(R,B){-e*(v*R/(k+R))*B}
+g  = function(R,B){(v*R/(k+R)*B)}
+v  = 1.4
+e  = 0.0000007
+k  = 1
+
+## An empty vector to store the results
+R <-c()
+B <-c()
+## Store the initial condition in the first position of the vector
+R[1] <- R0
+B[1] <- B0
+# loop over time: approximate the function at each time step
+for (i in 1:(length(time)-1)){
+  R[i+1]=R[i]+timestep*f(R[i],B[i])
+  B[i+1]=B[i]+timestep*g(R[i],B[i])
+}
+#basic plots
+plot(time, R)
+plot(time, B)
+
+#ggplots
+dataFramePlotsRB = data.frame(x = time, R = R, B = B)
+
+#R
+dataFramePlotsRB %>%
+  ggplot(aes(x = x, y = R)) + geom_point() +
+  theme_bw() +
+  ggtitle(paste0("Approximate solution of R for time step of ", timestep, "")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+#B
+dataFramePlotsRB %>%
+  ggplot(aes(x = x, y = B)) + geom_point() +
+  theme_bw() +
+  ggtitle(paste0("Approximate solution of B for time step of ", timestep, "")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+
+
+
+```{r}
+###################
+#answer question c:
+###################
+
+#set timestep to 0.01 to see some surprising behaviour:
+timestep = 0.01
+maxtime  = 12
+time     = seq(0, maxtime, by = timestep)
+
+R0 = 350
+B0 = 1000
+f  = function(R,B){-e*(v*R/(k+R))*B}
+g  = function(R,B){(v*R/(k+R)*B)}
+v  = 1.4
+e  = 0.0000007
+k  = 1
+
+## An empty vector to store the results
+R <-c()
+B <-c()
+## Store the initial condition in the first position of the vector
+R[1] <- R0
+B[1] <- B0
+# loop over time: approximate the function at each time step
+for (i in 1:(length(time)-1)){
+  R[i+1]=R[i]+timestep*f(R[i],B[i])
+  B[i+1]=B[i]+timestep*g(R[i],B[i])
+}
+
+#ggplots
+dataFramePlotsRB = data.frame(x = time, R = R, B = B)
+
+#R
+dataFramePlotsRB %>%
+  ggplot(aes(x = x, y = R)) + geom_point() +
+  theme_bw() +
+  ggtitle(paste0("Approximate solution of R for time step of ", timestep, "")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+#B
+dataFramePlotsRB %>%
+  ggplot(aes(x = x, y = B)) + geom_point() +
+  theme_bw() +
+  ggtitle(paste0("Approximate solution of B for time step of ", timestep, "")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+############################
+#fun wiggles occur at 0.0075:
+############################
+
+timestep = 0.0075
+maxtime  = 12
+time     = seq(0, maxtime, by = timestep)
+
+## An empty vector to store the results
+R <-c()
+B <-c()
+## Store the initial condition in the first position of the vector
+R[1] <- R0
+B[1] <- B0
+# loop over time: approximate the function at each time step
+for (i in 1:(length(time)-1)){
+  R[i+1]=R[i]+timestep*f(R[i],B[i])
+  B[i+1]=B[i]+timestep*g(R[i],B[i])
+}
+
+#ggplots
+dataFramePlotsRB = data.frame(x = time, R = R, B = B)
+
+#R
+dataFramePlotsRB %>%
+  ggplot(aes(x = x, y = R)) + geom_line() +
+  theme_bw() +
+  ggtitle(paste0("Approximate solution of R for time step of ", timestep, "")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+#B
+dataFramePlotsRB %>%
+  ggplot(aes(x = x, y = B)) + geom_line() +
+  theme_bw() +
+  ggtitle(paste0("Approximate solution of B for time step of ", timestep, "")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+#Taken together: values below about 0.0075 should be fine.
+
+```
+

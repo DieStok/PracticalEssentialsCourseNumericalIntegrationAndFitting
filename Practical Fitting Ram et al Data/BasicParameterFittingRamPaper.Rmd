@@ -1,0 +1,132 @@
+---
+title: "Basic Parameter fitting Ram et al. Paper"
+output: html_notebook
+---
+
+We now move from numerical integration of a given formula to fitting parameters to data. This means we will require a few new tools. For this we will use a programme/set of R functions called Grind. It may cause you some level of amusement, nay, it might make you positively giddy and gay, to know that the required functions are hence in the file grind.R. Grind is a wrapper around the DeSolve library that you just happened upon in question 2 while performing runge-kutta 23 numerical integration, and some others. You didn't really have to change much about the formula, parameters, and state there, but now you will have to do so, so let's get you up to speed!
+
+
+
+```{r, include= FALSE}
+#loading required packages and sourcing Grind
+if(!require(pacman)) {
+install.packages("pacman"); require(pacman)}
+p_load(tidyverse, rootSolve, deSolve, FME)
+source("grind.R")
+
+```
+Let's load the data for the red strain in experiment A1 (so the data that they fit for Figure 3 A1). Then, we will fit the parameters of the growth curve.
+
+```{r}
+fig3RA <- readr::read_csv("Fig3/2015-11-18_R.csv")
+fig3RA =  fig3RA %>% dplyr::rename(Identifier = ...1)
+head(fig3RA)
+
+```
+Q1: Look at the data we just loaded in. Which variables do you think we will be using for the fitting?
+
+#Answer: That would be Time and OD. The identifiers are unimportant. We don't care about the Row and Column of the wells the bacteria were growing in, nor do the tiny fluctuations in the temperature value measured or the Cycle Nr. matter much. We just want to fit the growth curve, which is Time and OD. 
+
+Before we fit the actual data, let's go over the syntax Grind and deSolve use. Below, I define one differential equation, which I call dN. We define a function called model. As arguments it uses t (for a vector of time points), state (for a vector containing the starting state of the variables in the system, think R0 and B0 from before), and parms (for a vector containing the parameters of the system). State and parameters should be named vectors. This means that if you use a parameter v in your formula, you want the name of that value in the vector parms to be "v". You can also change these names after making a vector if you want. You see an example of making a named vector and renaming it below. 
+
+
+```{r}
+model <- function(t, state, parms) {
+  with(as.list(c(state,parms)), {
+    a <- q0*2 - t
+    dN <- r*a*N*(1/v)
+    return(list(dN))  
+  }) 
+}
+
+parametersForFitting = c(v = 1.22, r = 1.05, q0 = 0.0023)
+print(names(parametersForFitting))
+names(parametersForFitting)[1] = "suchChangeMuchW0W"
+print(names(parametersForFitting))
+#let's change it back. No Venetian nobles allowed on my watch!
+names(parametersForFitting)[1] = "v"
+
+```
+the with(as.list(c(state, parms))) does nothing more than make these names available without having to write parms["v"] every time you want to use v from the parameters vector, and parms["q0"] every time you want to use q0. Then, there's the part where actual calculations are done and the value of the differential equation for a given time point is calculated. As you can see, you are free to calculate other (time-dependent) parameters which are not the differential equation within this section. a is an example of that. Then there's the differential equation. Finally, the function returns a list of the differential equation results for the input timepoint(s). Let's use this equation with Grind, first for numerical integration of the ODE we defined above.
+
+```{r}
+#First, normal numerical integration without any fitting. These are nonsense parameters!
+
+#We need a starting amount of bacteria
+initialState         = c(N = 0.124) #units are OD.
+parametersForFitting = c(v = 1.22, r = 1.05, q0 = 0.0023)
+
+
+#numerically integrate the model, from time 1 to 100
+#use as the initial values (the state vector) initialState
+#find the parameters in the named vector parametersForFitting
+#the equation for the ODE/calculations we want to do are in the function called model
+run(tmax = 100, tstep = 1,
+    state = initialState,
+    parms = parametersForFitting,
+    odes = model
+    )
+
+```
+It becomes painfully clear that we are using a nonsensical equation (and/or parameters), since our bacteria are dying like they have a train to catch in bacteria heaven. You see that Grind automatically plots and adds a legend. Pretty nifty. If you are a ggplot purist, then you can do the following:
+
+```{r}
+#still plots, can make it not do that by adding timeplot = FALSE to the run command call.
+grindResultsTimeCourse = run(tmax = 100, tstep = 1,
+                              state = initialState,
+                              parms = parametersForFitting,
+                              odes = model, table = TRUE, draw = points
+                            )
+
+print(head(grindResultsTimeCourse))
+ggplot(grindResultsTimeCourse, aes(x= time, y = N)) +
+  geom_point(colour = "red") +
+  theme_bw()
+```
+Note that drawing points gives us a fairer view of what we are actually calculating: in the first 4 time steps the bacterial population basically drops to 0 very rapidly. The rest of the time course just steps ever closer to 0. Not really useful, but luckily silicon doesn't care. You might have noticed that because grind is just a collection of functions that you source (not a package), it's not as easy to look at the function parameters. You can always open grind.R and search for the run function to see the parameters it has and play around, or look at the tutorial that explains the functions and their uses here: https://tbb.bio.uu.nl/rdb/grindR/tutorial.pdf . Now, on to fitting!
+
+To fit, we need to do two things:
+1. Tell Grind which parameters we would like to fit to the data
+2. Tell Grind what the lower (or upper) bounds are for certain parameters, if we want them.
+
+Regarding the second point, you can imagine that we don't want negative growth speeds or other parameters.
+
+```{r, warning=FALSE}
+
+#we make a character vector of all the variables we want Grind to fit. Here, that's N and all the parameters.
+free <- c("N",names(parametersForFitting))
+#for the lower bound, we bound everything at 0, and v at 1. A decelaration parameter that becomes lower than 1 would accelerate given the formula, so that would be strange
+lower <- rep(0, length(free)); lower[match("v",free)] <- 1; lower  # set lower bounds
+
+
+#to fit, Grind wants a data frame with time and the variables it needs to fit. Note how we rename OD to N to be consistent.
+data3RA <- as.data.frame(cbind(fig3RA$Time,fig3RA$OD)); names(data3RA) <- c("time","N")
+
+#now we fit the parameters. fun = log tells the fitting that we want to fit the log of the data, not the actual data. The other parameters are self-explanatory. Note that we also start from some initial parameter values and improve the fit from there. For now, we'll just use the parameters from above.
+fit3RA  <- fit(data3RA, state = initialState, odes = model, parms = parametersForFitting,
+               free=free,fun=log,lower=lower,pch=".",
+               legend=FALSE,tstep=0.1,main="Fig 3 a red monoculture (fun=log)",
+               ymin = 0, ymax = 1
+               )
+summary(fit3RA)
+
+```
+
+You will see that the fit is completely wrong. That is logical, since we are fitting a nonsensical example function, and are also fitting quite many parameters to quite little data. It is now up to you to define the actual model below, using the correct equations from the paper, and fit the data from figure 3 A1 properly. Before you do that, one more question:
+
+Q2 : We wanted to fit to the log of the data. Why do you think we do that? What characteristics of taking the log would you think could improve the fit we get?
+
+#Answer:The error metric used during fitting is the sum of squares. If you square a small value, it becomes even smaller. That means that large discrepancies are weighed higher during fitting: you care more about 1 point being off a lot, than many points being off a little. To correct for this discrepancy, log puts these values on a more even footing.
+
+
+
+
+
+
+
+
+
+
+
+
+Now you know some basics about using Grind. We wholeheartedly recommend you to read at least the first part of the tutorial explaining the Grind functions here: https://tbb.bio.uu.nl/rdb/grindR/tutorial.pdf, especially if you have never worked with Grind/ODE integration at all before.
