@@ -121,7 +121,7 @@ for (exp in seq_along(expSeq)) {
   print(paste0("Fitting figure 3 data for the red bacteria for: ", names(expSeq[exp])))
   fitFig3RLoop <- fit(dataFig3RLoop,free=freeLoop,fun=log,lower=lowerLoop,
                    pch=".",legend=FALSE,tstep=0.1,main=paste0("Fig 3 Red for ",names(expSeq[exp])),
-                   ymin = 0, ymax = 1)
+                   ymin = 0, ymax = 1, odes = model, parms = pLoop, state = sLoop)
   
   #Green data and fit
   
@@ -130,7 +130,7 @@ for (exp in seq_along(expSeq)) {
   print(paste0("Fitting figure 3 data for the green bacteria for: ", names(expSeq[exp])))
   fitFig3GLoop <- fit(dataFig3GLoop,free=freeLoop,fun=log,lower=lowerLoop,
                    pch=".",legend=FALSE,tstep=0.1,main=paste0("Fig 3 Green for ",names(expSeq[exp])),
-                   ymin = 0, ymax = 1)
+                   ymin = 0, ymax = 1, odes = model, parms = pLoop, state = sLoop)
   
   #add to list under correct name
   listFitsFigure3[[paste0("Data", names(expSeq)[exp], "Fig3G")]] <- dataFig3GLoop

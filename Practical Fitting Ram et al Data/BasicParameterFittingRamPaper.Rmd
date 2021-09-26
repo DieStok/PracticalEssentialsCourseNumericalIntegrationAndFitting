@@ -18,8 +18,7 @@ source("grind.R")
 Let's load the data for the red strain in experiment A1 (so the data that they fit for Figure 3 A1). Then, we will fit the parameters of the growth curve.
 
 ```{r}
-fig3RA <- readr::read_csv("Fig3/2015-11-18_R.csv")
-fig3RA =  fig3RA %>% dplyr::rename(Identifier = ...1)
+fig3RA <- readr::read_csv("Fig3/2015-11-18_R.csv") %>% dplyr::rename(Identifier = ...1)
 head(fig3RA)
 
 ```
@@ -27,19 +26,22 @@ Q1: Look at the data we just loaded in. Which variables do you think we will be 
 
 #Answer: That would be Time and OD. The identifiers are unimportant. We don't care about the Row and Column of the wells the bacteria were growing in, nor do the tiny fluctuations in the temperature value measured or the Cycle Nr. matter much. We just want to fit the growth curve, which is Time and OD. 
 
-Before we fit the actual data, let's go over the syntax Grind and deSolve use. Below, I define one differential equation, which I call dN. We define a function called model. As arguments it uses t (for a vector of time points), state (for a vector containing the starting state of the variables in the system, think R0 and B0 from before), and parms (for a vector containing the parameters of the system). State and parameters should be named vectors. This means that if you use a parameter v in your formula, you want the name of that value in the vector parms to be "v". You can also change these names after making a vector if you want. You see an example of making a named vector and renaming it below. 
+Before we fit the actual data, let's go over the syntax Grind and deSolve use. Below, I define a function called model. This function can be used to calculate the values of the differential equation dN at different time points through numerical integration, or for fitting later. As arguments it uses t (for a vector of time points), state (for a vector containing the starting state of the variables in the system, think R0 and B0 from before), and parms (for a vector containing the parameters of the system). State and parameters should be named vectors. This means that if you use a parameter v in your formula, you want the name of that value in the vector parms to be "v". You can also change these names after making a vector if you want. You see an example of making a named vector and renaming it below. 
 
 
 ```{r}
+
+#just change to the correct function for fitting.
+
 model <- function(t, state, parms) {
   with(as.list(c(state,parms)), {
-    a <- q0*2 - t
-    dN <- r*a*N*(1/v)
+    a <- q0/(q0+exp(-m*t))
+    dN <- r*a*N*(1-(N/K)^v)
     return(list(dN))  
   }) 
 }
 
-parametersForFitting = c(v = 1.22, r = 1.05, q0 = 0.0023)
+parametersForFitting = c(v = 1.22, r = 1.05, q0 = 0.0023, m = 2, K = 0.6)
 print(names(parametersForFitting))
 names(parametersForFitting)[1] = "suchChangeMuchW0W"
 print(names(parametersForFitting))
@@ -54,7 +56,7 @@ the with(as.list(c(state, parms))) does nothing more than make these names avail
 
 #We need a starting amount of bacteria
 initialState         = c(N = 0.124) #units are OD.
-parametersForFitting = c(v = 1.22, r = 1.05, q0 = 0.0023)
+parametersForFitting = c(v = 1.22, r = 1.05, q0 = 0.0023, m = 2, K = 0.6)
 
 
 #numerically integrate the model, from time 1 to 100
