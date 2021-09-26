@@ -7,7 +7,7 @@ output: html_notebook
 ```{r}
 if(!require(pacman)) {
 install.packages("pacman"); require(pacman)}
-p_load(tidyverse)
+p_load(tidyverse, RColorBrewer)
 ```
 
 
@@ -27,9 +27,15 @@ x <- c()
 x[1] <- x0
     
 # loop over time: approximate the function at each time step
+
+#timing for question c
+startTime = proc.time() 
 for (i in 1:(length(time)-1)){
   x[i+1] = x[i] + timestep * f(x[i])
 }
+#timing for question c
+calculationTime = proc.time() - startTime
+
     
 # Base R plotting 
 plot(x~time)
@@ -49,7 +55,8 @@ ggplot2::ggplot(data = dataFramePlot,
   geom_line(data = dataFramePlot %>% subset(solution_method != "Approximation"), size = 1.2) +
   theme_bw() +
   ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_brewer(palette = "Paired")
   
   
   
@@ -61,216 +68,42 @@ ggplot2::ggplot(data = dataFramePlot,
 #need the absolute difference between the approximate and analytical solution at each time step, then take the sum of that.
 differences = abs(x - 0.1 * exp(time)/(1+0.1*(exp(time)-1.)))
 totalDifferences = sum(differences)
+print(totalDifferences)
 ```
 
 
 ```{r}
-#Note: for minimal differences in formatting and ease of comparison with your own answers, we just copied the code and renamed our variables according to the time step. In the real world, you should not repeat yourself: whenever you find yourself copying code, turn it into a function!
+#In coding, you should observe DRY, Don't Repeat Yourself. Hence, we put the code into a function that allows us to change the timestep and plot the results. We'll run this with a large and a small time step. 
+source("HelperFunctionsAnswerFile.R")
 
 ####################
 ##Answer question c:
 ####################
 
-#for time step is 5 the plot looks as follows: 
-timestep      = 5
-time          = seq(0, 10, by = timestep)
+#for time step is 2
+resultLargeStep = runSimpleNumericalIntegration(timeStep = 2, maxTime = 500)
+resultLargeStep$timeExpended
+resultLargeStep$Totdifferences
+#it is clear that the integration is going completely awry here, overshooting and undershooting a lot.
+#The summed difference is qite large (~9.65)
 
-# initial condition
-x0 <- 0.1
-## The function to be integrated (right-hand expression of the derivative above)
-f <- function(x){x * (1.-x)}
-    
-## An empty R vector to store the results
-xFive <- c()
-## Store the initial condition in the first position of the vector
-xFive[1] <- x0
-    
-# loop over time: approximate the function at each time step
-for (i in 1:(length(time)-1)){
-  xFive[i+1] = xFive[i] + timestep * f(xFive[i])
-}
+#you can see this even better if you only perform a few steps.
+resultLargeStepShortInterval = runSimpleNumericalIntegration(timeStep = 2, maxTime = 6)
 
-xAnalyticFive = 0.1 * exp(time)/(1+0.1*(exp(time)-1.))
-
-dataFramePlotFive <- data.frame(x_value = c(xFive, 0.1 * exp(time)/(1+0.1*(exp(time)-1.))),
-                           time = time,
-                           solution_method = c(rep("Approximation", length(xFive)), rep("Analytical", length(xFive)))
-                           )
-
-ggplot2::ggplot(data = dataFramePlotFive,
-                aes (x = time, y = x_value, colour = solution_method)) + 
-  geom_point(data = dataFramePlotFive %>% subset(solution_method == "Approximation"), size = 2) +
-  geom_line(data = dataFramePlotFive %>% subset(solution_method != "Approximation"), size = 1.2) +
-  theme_bw() +
-  ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) +
-  theme(plot.title = element_text(hjust = 0.5))
-
-#clearly, the approximation first severely underestimates, and then severely overestimate, the actual solution.
-
-#This is reflected in the sum of differences:
-differencesFive      = abs(xFive - 0.1 * exp(time)/(1+0.1*(exp(time)-1.)))
-totalDifferencesFive = sum(differencesFive)
-print(paste0("Total differences between numerically integrated and analytic solution if timestep is ",
-             timestep, ": ",
-             totalDifferencesFive)
-      )
-
-
-#If you put the time step at 0.001, the approximation is almost equal to the analytical solution, but a lot more calculations need to be done.
-
-timestep      = 0.001
-time          = seq(0, 10, by = timestep)
-
-# initial condition
-x0 <- 0.1
-## The function to be integrated (right-hand expression of the derivative above)
-f <- function(x){x * (1.-x)}
-    
-## An empty R vector to store the results
-xPointZeroZeroOne <- c()
-## Store the initial condition in the first position of the vector
-xPointZeroZeroOne[1] <- x0
-    
-# loop over time: approximate the function at each time step
-for (i in 1:(length(time)-1)){
-  xPointZeroZeroOne[i+1] = xPointZeroZeroOne[i] + timestep * f(xPointZeroZeroOne[i])
-}
-
-xAnalyticPointZeroZeroOne = 0.1 * exp(time)/(1+0.1*(exp(time)-1.))
-
-dataFramePlotPointZeroZeroOne <- data.frame(x_value = c(xPointZeroZeroOne, 0.1 * exp(time)/(1+0.1*(exp(time)-1.))),
-                           time = time,
-                           solution_method = c(rep("Approximation", length(xPointZeroZeroOne)), rep("Analytical", length(xPointZeroZeroOne)))
-                           )
-
-ggplot2::ggplot(data = dataFramePlotPointZeroZeroOne,
-                aes (x = time, y = x_value, colour = solution_method)) + 
-  geom_point(data = dataFramePlotPointZeroZeroOne %>% subset(solution_method == "Approximation"), size = 2) +
-  geom_line(data = dataFramePlotPointZeroZeroOne %>% subset(solution_method != "Approximation"), size = 1.2) +
-  theme_bw() +
-  ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) +
-  theme(plot.title = element_text(hjust = 0.5))
-
-
-#The sum of differences is much smaller.
-differencesPointZeroZeroOne      = abs(xPointZeroZeroOne - 0.1 * exp(time)/(1+0.1*(exp(time)-1.)))
-totalDifferencesPointZeroZeroOne = sum(differencesPointZeroZeroOne)
-print(paste0("Total differences between numerically integrated and analytic solution if timestep is ",
-             timestep, ": ",
-             totalDifferencesPointZeroZeroOne)
-      )
-
-
+#If you set the time step to be small things turn out a lot better.
+resultSmallStep = runSimpleNumericalIntegration(timeStep = 0.01, maxTime = 500)
+resultSmallStep$timeExpended
+resultSmallStep$Totdifferences
+#Here the integration works fine. The total sum of differences is also much smaller: ~0.34
 
 ```
 
 
-
-```{r}
 ####################
 ##Answer question d:
 ####################
 
-#for time step is 5 the plot looks as follows: 
-timestep      = 5
-time          = seq(0, 10, by = timestep)
+#This is already shown in the code above for answer A. For smaller time steps and longer time spans, execution time increases. It is not a linear relationship, which you would expect. This is because all sorts of things happen under the hood that muddle the direct dependency.
 
-# initial condition
-x0 <- 0.1
-## The function to be integrated (right-hand expression of the derivative above)
-f <- function(x){x * (1.-x)}
-    
-## An empty R vector to store the results
-xFive <- c()
-## Store the initial condition in the first position of the vector
-xFive[1] <- x0
-    
-# loop over time: approximate the function at each time step
-ptm <- proc.time()
-for (i in 1:(length(time)-1)){
-  xFive[i+1] = xFive[i] + timestep * f(xFive[i])
-}
-
-timeTimestepFive = proc.time() - ptm
-
-xAnalyticFive = 0.1 * exp(time)/(1+0.1*(exp(time)-1.))
-
-dataFramePlotFive <- data.frame(x_value = c(xFive, 0.1 * exp(time)/(1+0.1*(exp(time)-1.))),
-                           time = time,
-                           solution_method = c(rep("Approximation", length(xFive)), rep("Analytical", length(xFive)))
-                           )
-
-ggplot2::ggplot(data = dataFramePlotFive,
-                aes (x = time, y = x_value, colour = solution_method)) + 
-  geom_point(data = dataFramePlotFive %>% subset(solution_method == "Approximation"), size = 2) +
-  geom_line(data = dataFramePlotFive %>% subset(solution_method != "Approximation"), size = 1.2) +
-  theme_bw() +
-  ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) +
-  theme(plot.title = element_text(hjust = 0.5))
-
-#clearly, the approximation first severely underestimates, and then severely overestimate, the actual solution.
-
-#This is reflected in the sum of differences:
-differencesFive      = abs(xFive - 0.1 * exp(time)/(1+0.1*(exp(time)-1.)))
-totalDifferencesFive = sum(differencesFive)
-print(paste0("Total differences between numerically integrated and analytic solution if timestep is ",
-             timestep, ": ",
-             totalDifferencesFive)
-      )
-
-
-#If you put the time step at 0.001, the approximation is almost equal to the analytical solution, but a lot more calculations need to be done.
-
-timestep      = 0.001
-time          = seq(0, 10, by = timestep)
-
-# initial condition
-x0 <- 0.1
-## The function to be integrated (right-hand expression of the derivative above)
-f <- function(x){x * (1.-x)}
-    
-## An empty R vector to store the results
-xPointZeroZeroOne <- c()
-## Store the initial condition in the first position of the vector
-xPointZeroZeroOne[1] <- x0
-    
-# loop over time: approximate the function at each time step
-ptm <- proc.time()
-for (i in 1:(length(time)-1)){
-  xPointZeroZeroOne[i+1] = xPointZeroZeroOne[i] + timestep * f(xPointZeroZeroOne[i])
-}
-timeTimestepPointZeroZeroOne = proc.time() - ptm
-
-xAnalyticPointZeroZeroOne = 0.1 * exp(time)/(1+0.1*(exp(time)-1.))
-
-dataFramePlotPointZeroZeroOne <- data.frame(x_value = c(xPointZeroZeroOne, 0.1 * exp(time)/(1+0.1*(exp(time)-1.))),
-                           time = time,
-                           solution_method = c(rep("Approximation", length(xPointZeroZeroOne)), rep("Analytical", length(xPointZeroZeroOne)))
-                           )
-
-ggplot2::ggplot(data = dataFramePlotPointZeroZeroOne,
-                aes (x = time, y = x_value, colour = solution_method)) + 
-  geom_point(data = dataFramePlotPointZeroZeroOne %>% subset(solution_method == "Approximation"), size = 2) +
-  geom_line(data = dataFramePlotPointZeroZeroOne %>% subset(solution_method != "Approximation"), size = 1.2) +
-  theme_bw() +
-  ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) +
-  theme(plot.title = element_text(hjust = 0.5))
-
-
-#The sum of differences is much smaller.
-differencesPointZeroZeroOne      = abs(xPointZeroZeroOne - 0.1 * exp(time)/(1+0.1*(exp(time)-1.)))
-totalDifferencesPointZeroZeroOne = sum(differencesPointZeroZeroOne)
-print(paste0("Total differences between numerically integrated and analytic solution if timestep is ",
-             timestep, ": ",
-             totalDifferencesPointZeroZeroOne)
-      )
-
-
-print("Calculation time for time step 5: ")
-print(timeTimestepFive)
-print("Calculation time for time step 0.01: ")
-print(timeTimestepPointZeroZeroOne)
-
-
-```
+#for more intense timing needs, the package microbenchmark can be used. However, because the calculations here are so quick, execution time is sometimes difficult to measure and that would be overkill in this situation. Good to remember for later though.
 
