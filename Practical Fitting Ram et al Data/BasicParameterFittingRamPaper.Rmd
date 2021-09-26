@@ -1,0 +1,254 @@
+---
+title: "Basic Parameter fitting Ram et al. Paper"
+output:
+  html_document:
+    df_print: paged
+---
+
+We now move from numerical integration of a given formula to fitting parameters to data. This means we will require a few new tools. For this we will use a programme/set of R functions called Grind. It may cause you some level of amusement, nay, it might make you positively giddy and gay, to know that the required functions are hence in the file grind.R. Grind is a wrapper around the DeSolve library that you just happened upon in question 2 while performing runge-kutta 23 numerical integration, and some others. You didn't really have to change much about the formula, parameters, and state there, but now you will have to do so, so let's get you up to speed!
+
+
+
+```{r, include= FALSE}
+#loading required packages and sourcing Grind
+if(!require(pacman)) {
+install.packages("pacman"); require(pacman)}
+p_load(tidyverse, rootSolve, deSolve, FME)
+source("grind.R")
+
+
+```
+Let's load the data for the red strain in experiment A1 (so the data that they fit for Figure 3 A1). Then, we will fit the parameters of the growth curve.
+
+```{r}
+fig3RA <- readr::read_csv("Fig3/2015-11-18_R.csv") %>% dplyr::rename(Identifier = ...1)
+head(fig3RA)
+
+```
+Question: Look at the data we just loaded in. Which variables do you think we will be using for the fitting?
+
+
+Before we fit the actual data, let's go over the syntax Grind and deSolve use. Below, I define a function called model. This function can be used to calculate the values of the differential equation dN at different time points through numerical integration, or for fitting later. As arguments it uses t (for a vector of time points), state (for a vector containing the starting state of the variables in the system, think R0 and B0 from before), and parms (for a vector containing the parameters of the system). State and parameters should be named vectors. This means that if you use a parameter v in your formula, you want the name of that value in the vector parms to be "v". You can also change these names after making a vector if you want. You see an example of making a named vector and renaming it below. 
+
+
+```{r}
+
+model <- function(t, state, parms) {
+  with(as.list(c(state,parms)), {
+    a <- q0/(q0+exp(-m*t))
+    dN <- r*a*N*(1-(N/K)^v)
+    return(list(dN))  
+  }) 
+}
+
+parametersForFitting = c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+print(names(parametersForFitting))
+names(parametersForFitting)[1] = "suchChangeMuchW0W"
+print(names(parametersForFitting))
+#let's change it back. No Venetian nobles allowed on my watch!
+names(parametersForFitting)[1] = "v"
+
+```
+the with(as.list(c(state, parms))) does nothing more than make these names available without having to write parms["v"] every time you want to use v from the parameters vector, and parms["q0"] every time you want to use q0. Then, there's the part where actual calculations are done and the value of the differential equation for a given time point is calculated. As you can see, you are free to calculate other (time-dependent) parameters which are not the differential equation within this section. a is an example of that. Then there's the differential equation. Finally, the function returns a list of the differential equation results for the input timepoint(s). Let's use this equation with Grind, first for numerical integration of the ODE we defined above.
+
+```{r}
+#First, normal numerical integration without any fitting. These are nonsense parameters!
+
+#We need a starting amount of bacteria
+initialState         = c(N = 0.124) #units are OD.
+parametersForFitting = c(v = 1.22, r = 1.05, q0 = 0.0023, m = 2, K = 0.6)
+
+
+#numerically integrate the model, from time 1 to 100
+#use as the initial values (the state vector) initialState
+#find the parameters in the named vector parametersForFitting
+#the equation for the ODE/calculations we want to do are in the function called model
+run(tmax = 100, tstep = 1,
+    state = initialState,
+    parms = parametersForFitting,
+    odes = model
+    )
+
+```
+You see that Grind automatically plots and adds a legend. Pretty nifty. If you are a ggplot purist, then you can do the following:
+
+```{r}
+#still plots, can make it not do that by adding timeplot = FALSE to the run command call.
+#draw = points gives scatter plot rather than line plot
+#table = TRUE makes run return the results from the numerical integration in a handy table.
+grindResultsTimeCourse = run(tmax = 100, tstep = 1,
+                              state = initialState,
+                              parms = parametersForFitting,
+                              odes = model, table = TRUE, draw = points
+                            )
+
+print(head(grindResultsTimeCourse))
+ggplot(grindResultsTimeCourse, aes(x= time, y = N)) +
+  geom_point(colour = "red") +
+  theme_bw()
+```
+Note that drawing points gives us a fairer view of what we are actually calculating: in the first 7 time steps the bacterial population rises rapidly to the carrying capacity. The rest of the time course just remains at ~0.6. Not really useful, but luckily silicon doesn't care. You might have noticed that because grind is just a collection of functions that you source (not a package), it's not as easy to look at the function parameters. You can always open grind.R and search for the run function to see the parameters it has and play around, or look at the tutorial that explains the functions and their uses here: https://tbb.bio.uu.nl/rdb/grindR/tutorial.pdf . Now, on to fitting!
+
+To fit, we need to do two things:
+1. Tell Grind which parameters we would like to fit to the data
+2. Tell Grind what the lower (or upper) bounds are for certain parameters, if we want them.
+
+Regarding the second point, you can imagine that we don't want negative growth speeds. That would be a case for bounding to 0.
+
+```{r, warning=FALSE}
+
+#we make a character vector of all the variables we want Grind to fit. Here, that's N and all the parameters.
+free <- c("N",names(parametersForFitting))
+#for the lower bound, we bound everything at 0, and v at 1. A decelaration parameter that becomes lower than 1 would accelerate given the formula, so that would be strange
+lower <- rep(0, length(free)); lower[match("v",free)] <- 1; lower  # set lower bounds
+
+
+#to fit, Grind wants a data frame with time and the variables it needs to fit. Note how we rename OD to N to be consistent.
+data3RA <- as.data.frame(cbind(fig3RA$Time,fig3RA$OD)); names(data3RA) <- c("time","N")
+
+#now we fit the parameters. fun = log tells the fitting that we want to fit the log of the data, not the actual data. The other parameters are self-explanatory. Note that we also start from some initial parameter values and improve the fit from there. For now, we'll just use the parameters from above.
+fit3RAlog  <- fit(data3RA, state = initialState, odes = model, parms = parametersForFitting,
+               free=free, fun=log, lower=lower, pch=".",
+               legend=FALSE, tstep=0.1, main="Fig 3 a red monoculture (fun=log)",
+               ymin = 0, ymax = 1
+               )
+summary(fit3RAlog)
+
+fit3RA     <- fit(data3RA, state = initialState, odes = model, parms = parametersForFitting,
+               free=free, lower=lower, pch=".",
+               legend=FALSE, tstep=0.1, main="Fig 3 a red monoculture",
+               ymin = 0, ymax = 1
+               )
+summary(fit3RA)
+
+#in this fit, you can get at the fitted parameters using $par
+print(fit3RA$par)
+```
+
+You see that you obtain a rather nice fit to this data. Do note that you are fitting quite a lot of parameters to little data. Be sure to go over the summary of the fitting and try to understand what things mean. What do you think parameter correlation stands for? What do higher standard errors for the parameters indicate? Think about this for a moment, and ask us if you have no clue! Before you go on, one more question:
+
+_Dit moet ws. anders want staat vast ook in de Latex file._
+Question: Above, we fit the log of the data (so the log of the OD of bacterial density). As a comparison, we also did the fitting without taking the log. You can see there is a slight difference in the fits. Why do you think we prefer the log? What characteristics of taking the log would you think could improve the fit we get?
+
+
+Now you know some basics about using Grind. We wholeheartedly recommend you to read at least the first part of the tutorial/manual explaining the Grind functions here: https://tbb.bio.uu.nl/rdb/grindR/tutorial.pdf, especially if you have never worked with Grind/ODE integration at all before.
+
+
+The below loads in all the data from the Ram paper and fits single growth curves using standard parameters and starting state. In this way, you easily have all data available. This data is in a list. You can look at sections of this list using $ or [[]]. As for the plots of the standard fits, note that unfortunately Grind's standard time plot uses a specific colour palette, one for each ODE to plot, and since we fit green and red separately it is not easily possible to make the colours green for the green bacteria.
+
+```{r}
+dataAndFitsFigureThree = readInDataFigureThreeRamPaper()
+
+#you can access the data using either $ or [[]]:
+head(dataAndFitsFigureThree$DataexptAFig3G)
+head(dataAndFitsFigureThree[["DataexptAFig3R"]])
+
+#up to you to fit the data for exptB for the red strain (so figure 3 B1 from the paper). Use the fit function (like we did above, be sure to use fun=log!) and dataAndFitsFigureThree$DataexptBFig3R for this. You can check to see if you did it correctly by comparing it to dataAndFitsFigureThree$FitexptBFig3R.
+
+
+```
+
+q0 and m are lag phase parameters. It is clear in figure3 B1, B2, C3 and C3 of the paper that there is no lag phase. However, in our standard procedure we do fit those parameters. Does that work? Check the fits for the data from experiment B and C, and see what happens with these two parameters. What are the estimates, and why?
+
+```{r}
+#query the fits in the list above. You can just print them (especially their $par component that holds the fitted parameters), or print their summary()
+
+
+```
+
+Until now, we have done pretty much as the authors did in Figure 3: produced separate fits for their separate datasets. However, we could try to find out whether the differences between the red and green bacteria can be described in fewer parameters. They don't end up at the same final level, but other than that their growth curves look extremely alike. In other words: we'd like to fit certain parameters together (taking advantage of more data for doing that), while we want to let others differ (those we need to produce the separate behaviours, in this case the higher OD for red at the end, and red's faster shift to exponential growth from the stationary phase).
+
+To do this, we need a way of telling Grind:
+-What parameters to fit for all data together
+-What to fit separately per dataset.
+-Which data to use for fitting.
+
+To specify what parameters should be fit differently for the different datasets, you can use the differ parameter. This simply means that you set, for example, `differ = c("m", "v", "K")` in the call to the fit function. Grind automatically understand that the parameters to fit together are all those which are not in the differ parameter. Finally, to use multiple data sets for fitting, you need to give a list of the datasets. In this case, that would be `list(dataAndFitsFigureThree$DataexptAFig3G, dataAndFitsFigureThree$DataexptAFig3R)`. You need one more thing: we want to set the lower bound of v to 1. But now, we are fitting 2*the parameters that differ per dataset, + all those that don't for all data together. So we need some code to make sure that both v1 (for red) and v2 (for green) have a lower bound of 1. To do that, we use the following:
+
+```{r}
+#set up state, parameters, and what to fit separately
+initialState  <- c(N=0.124)
+initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+free <- c("N",names(initialParams))
+differ <- c("K", "v", "m")
+
+#the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted combined for the two datasets
+totfree <- c(free[!(free %in% differ)], differ, differ)
+npar <- length(totfree)
+cat("Number of free parameters",npar)
+
+#Now set all instances of v in the total number of parameters to fit to 1, and all the other lower bounds to 0
+lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
+```
+
+Up to you to make fits of the red and green data for experiment A combined. Use the code above together with fit and a list of the green and red dataset. Investigate what the result is if you let different parameters differ or not, and what that would mean biologically. Also compare the sum of squares of the residuals of the separate fits with these combined fits: do you do (much) worse, or better?
+
+
+```{r}
+#combinedFit = fit() #yours to fill in!
+
+
+#combinedFit$par #to see the fitted parameters
+#combinedFit$ssr #to get to the sum of squared residuals, for comparison with the original fits
+
+
+```
+
+
+You've now fit the separate data and fit red and green together for experiment A. In the paper, what the authors do is say "Hey, if we first fit the separate growth curves, obtaining important parameters, and then grow the strains together to get data solely for fitting competition parameters (we already know the others from monoculture), we don't need frequency data!". This works well enough. However, in the end, they fit 14 parameters: 12 from the separate monoculture (6 per strain), + 2 competition parameters. Are they not overfitting? To investigate, let's do two things:
+
+1. First fit the c1 and c2 parameters for  experiment A as the authors did it.
+2. Rather than fitting c1 and c2, see what happens if you fit with only only one c parameter.
+
+Let's start with one. You need to do the following:
+-Define the set of ODE equations for 2 variables. Copy the one from the beginning, and edit it to dN1 and dN2
+-Read in the data from experiment 4 (it is in the folder Fig4; called "2015-11-18_RG.csv" for experiment A)
+-Tell Grind to fit this to the data of experiment A for red and green strains, while saying that 12 parameters should not be estimated (you need to take these directly from the separate fits for red and green). Do this by:
+  -->Setting `free = c(c1, c2)` in the `fit()` command. 
+  -->Setting `tweak="nsol$OD=nsol$N1+nsol$N2"` in the `fit()` command. Look at the plot and make sure you understand what     it does.
+  -->Setting `upper=2` in the `fit()` command
+
+Hints:
+-Be sure to rename all parameters.
+-Assume that the initial concentrations of red and green in the mixed experiment are equal (that is, the initial state should be half the initial OD for N1, and half of it for N2)
+-Be sure that the data is a data frame (not a tibble). This might cause errors with deSolve etc. otherwise
+
+After you've done this, interpret what c1 and c2 mean biologically.
+
+
+```{r}
+
+
+
+
+
+```
+
+#Answer: the Red strain (c1) experiences ~4 times less competition from green (c2) than vice versa (i.e. red is more hindered by its own population than by green; while green is hindered about 2 times as much by red as by itself). However, don't be fooled: this seemingly valid biological knowledge is wrong, as the next question (and the extreme parameter correlation in this fit) show(s). Note also the huge standard error in c2: it is all over the place!
+
+
+Now on to part 2: fitting with just one c parameter. The way to do this is to simply change the model and make it have only one c parameter used in the equation for N1 and N2, rather than c1 and c2, and then rerunning the fit. Don't forget to change `free`. After that's done, think about what your result means, and whether you would prefer 1 or 2 c parameters. Over to you!
+
+```{r}
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
