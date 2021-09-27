@@ -91,28 +91,6 @@ ggplot(grindResultsTimeCourse, aes(x= time, y = N)) +
 ```
 Note that drawing points gives us a fairer view of what we are actually calculating: in the first 7 time steps the bacterial population rises rapidly to the carrying capacity. The rest of the time course just remains at ~0.6. Not really useful, but luckily silicon doesn't care. You might have noticed that because grind is just a collection of functions that you source (not a package), it's not as easy to look at the function parameters. You can always open grind.R and search for the run function to see the parameters it has and play around, or look at the tutorial that explains the functions and their uses here: https://tbb.bio.uu.nl/rdb/grindR/tutorial.pdf . 
 
-* Question: Before you go on to fitting, perform the exercises in the .pdf given to you. Change around the K, v, and m and q0 parameters and try to interpret what they mean. You can use the code block below.
-
-```{r}
-#First, normal numerical integration without any fitting.
-
-# We need a starting amount of bacteria
-initialState         = c(N = 0.124) #units are OD.
-# parameters
-parametersForFitting = c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
-
-
-#numerically integrate the model, from time 1 to 100
-#use as the initial values (the state vector) initialState
-#find the parameters in the named vector parametersForFitting
-#the equation for the ODE/calculations we want to do are in the function called model
-run(tmax = 100, tstep = 1,
-    state = initialState,
-    parms = parametersForFitting,
-    odes = model
-    )
-```
-
 
 * Question: Before you go on to fitting, perform the exercises in Question 1 in the .pdf given to you. Change around the K, v, and m and q0 parameters and try to interpret what they mean, and plot the function of q0 and m. You can use the code block below.
 
@@ -248,18 +226,19 @@ q0 and m are lag phase parameters. It is clear in figure3 B1, B2, C3 and C3 of t
 
 
 
-# Question 3 --> aanpassen dat het juist rood A1 en A2 samen is! Of misschien allebei?
+# Question 3 
 
 
 
-Until now, we have done pretty much as the authors did in Figure 3: produced separate fits for their separate datasets. However, we could try to find out whether the differences between the red and green bacteria can be described in fewer parameters. They don't end up at the same final level, but other than that their growth curves look extremely alike. In other words: we'd like to fit certain parameters together (taking advantage of more data for doing that), while we want to let others differ (those we need to produce the separate behaviours, in this case the higher OD for red at the end, and red's faster shift to exponential growth from the stationary phase).
+Until now, we have done pretty much as the authors did in Figure 3: produced separate fits for their separate datasets. However, we know that the bacteria in figure 3 A1 are the same as in figure 3 B1. Sure, one is starting from the stationary phase and one isn't, but other than that they are the same. So we know they differ in some respects but are the same in others, and we'd like to leverage that in our fitting. In other words: we'd like to fit certain parameters together (taking advantage of more data for doing that), while we want to let others differ (those we need to produce the separate behaviours, in this case the lag parameters).
+
 
 To do this, we need a way of telling Grind:
 -What parameters to fit for all data together
 -What to fit separately per dataset.
 -Which data to use for fitting.
 
-To specify what parameters should be fit differently for the different datasets, you can use the differ parameter. This simply means that you set, for example, `differ = c("m", "v", "K")` in the call to the fit function. Grind automatically understand that the parameters to fit together are all those which are not in the differ parameter. Finally, to use multiple data sets for fitting, you need to give a list of the datasets. In this case, that would be `list(dataAndFitsFigureThree$DataexptAFig3G, dataAndFitsFigureThree$DataexptAFig3R)`. You need one more thing: we want to set the lower bound of v to 1. But now, we are fitting 2*the parameters that differ per dataset, + all those that don't for all data together. So we need some code to make sure that both v1 (for red) and v2 (for green) have a lower bound of 1. To do that, we use the following:
+To specify what parameters should be fit differently for the different datasets, you can use the differ parameter. This simply means that you set, for example, `differ = c("m", "v", "q0")` in the call to the fit function. Grind automatically understand that the parameters to fit together are all those which are not in the differ parameter. Finally, to use multiple data sets for fitting, you need to give a list of the datasets. In this case, that would be `list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptBFig3R)`. You need one more thing: we want to set the lower bound of v to 1. But now, we are fitting 2*the parameters that differ per dataset, + all those that don't for all data together. So we need some code to make sure that both v1 (for red) and v2 (for green) have a lower bound of 1. To do that, we use the following:
 
 ```{r}
 #set up state, parameters, and what to fit separately
@@ -277,7 +256,7 @@ cat("Number of free parameters",npar)
 lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
 ```
 
-Up to you to make fits of the red and green data for experiment A combined. Use the code above together with fit and a list of the green and red dataset. Investigate what the result is if you let different parameters differ or not, and what that would mean biologically. Also compare the sum of squares of the residuals of the separate fits with these combined fits: do you do (much) worse, or better?
+Up to you to make fits of the red strain from A1 and red strain from B1 for experiment A and B combined. Use the code above together with fit and a list of the red A1 and red B1 dataset. Investigate what the result is if you let different parameters differ or not, and what that would mean biologically. Also compare the sum of squares of the residuals of the separate fits with these combined fits: do you do (much) worse, or better?
 
 
 ```{r}
@@ -345,6 +324,41 @@ Question: look at your results, both the fitted value of the c parameter and the
 
 
 
+
+# Extra Question 5: Fitting red (A1) and green (A2) together:
+
+Similar to question 4, we could fit red (paper Figure 3 A1) and green (paper Figure 3 A2) together. Yes, they are different strains, but until now we have acted like they differ in 6 parameters (starting N, K, q0, v, m, r). We could try to find out whether the differences between the red and green bacteria can be described in fewer parameters. They don't end up at the same final level, but other than that their growth curves look extremely alike. In other words: we'd like to fit certain parameters together (taking advantage of more data for doing that), while we want to let others differ (those we need to produce the separate behaviours, in this case the higher OD for red at the end, and red's faster shift to exponential growth from the stationary phase).
+
+Follow the same recipe as the one you followed in question 4, now combining green and red, and vary which parameters you fit separately. 
+
+```{r}
+#set up state, parameters, and what to fit separately
+initialState  <- c(N=0.124)
+initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+free <- c("N",names(initialParams))
+differ <- c("K", "v", "m")
+
+#the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted combined for the two datasets
+totfree <- c(free[!(free %in% differ)], differ, differ)
+npar <- length(totfree)
+cat("Number of free parameters",npar)
+
+#Now set all instances of v in the total number of parameters to fit to 1, and all the other lower bounds to 0
+lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
+```
+
+Up to you to make fits of the red and green data for experiment A combined. Use the code above together with fit and a list of the green and red dataset. Investigate what the result is if you fit different parameters separately or not, and what that would mean biologically. Also compare the sum of squares of the residuals of the separate fits with these combined fits: do you do (much) worse, or better?
+
+
+```{r}
+#combinedFit = fit() #yours to fill in!
+
+
+#combinedFit$par #to see the fitted parameters
+#combinedFit$ssr #to get to the sum of squared residuals, for comparison with the original fits
+
+
+```
 
 
 

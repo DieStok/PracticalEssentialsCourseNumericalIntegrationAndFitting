@@ -251,17 +251,295 @@ dataAndFitsFigureThree$FitexptBFig3R$par
 #https://stackoverflow.com/questions/34700685/calculate-the-inverse-of-a-matrix-system-is-computationally-singular-error 
 
 
-# Question 3 --> aanpassen dat het juist rood A1 en A2 samen is!
+# Question 3 
 
+Until now, we have done pretty much as the authors did in Figure 3: produced separate fits for their separate datasets. However, we know that the bacteria in figure 3 A1 are the same as in figure 3 B1. Sure, one is starting from the stationary phase and one isn't, but other than that they are the same. So we know they differ in some respects but are the same in others, and we'd like to leverage that in our fitting. In other words: we'd like to fit certain parameters together (taking advantage of more data for doing that), while we want to let others differ (those we need to produce the separate behaviours, in this case the lag parameters).
 
-Until now, we have done pretty much as the authors did in Figure 3: produced separate fits for their separate datasets. However, we could try to find out whether the differences between the red and green bacteria can be described in fewer parameters. They don't end up at the same final level, but other than that their growth curves look extremely alike. In other words: we'd like to fit certain parameters together (taking advantage of more data for doing that), while we want to let others differ (those we need to produce the separate behaviours, in this case the higher OD for red at the end, and red's faster shift to exponential growth from the stationary phase).
 
 To do this, we need a way of telling Grind:
 -What parameters to fit for all data together
 -What to fit separately per dataset.
 -Which data to use for fitting.
 
-To specify what parameters should be fit differently for the different datasets, you can use the differ parameter. This simply means that you set, for example, `differ = c("m", "v", "K")` in the call to the fit function. Grind automatically understand that the parameters to fit together are all those which are not in the differ parameter. Finally, to use multiple data sets for fitting, you need to give a list of the datasets. In this case, that would be `list(dataAndFitsFigureThree$DataexptAFig3G, dataAndFitsFigureThree$DataexptAFig3R)`. You need one more thing: we want to set the lower bound of v to 1. But now, we are fitting 2*the parameters that differ per dataset, + all those that don't for all data together. So we need some code to make sure that both v1 (for red) and v2 (for green) have a lower bound of 1. To do that, we use the following:
+To specify what parameters should be fit differently for the different datasets, you can use the differ parameter. This simply means that you set, for example, `differ = c("m", "v", "q0")` in the call to the fit function. Grind automatically understand that the parameters to fit together are all those which are not in the differ parameter. Finally, to use multiple data sets for fitting, you need to give a list of the datasets. In this case, that would be `list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptBFig3R)`. You need one more thing: we want to set the lower bound of v to 1. But now, we are fitting 2*the parameters that differ per dataset, + all those that don't for all data together. So we need some code to make sure that both v1 (for red) and v2 (for green) have a lower bound of 1. To do that, we use the following:
+
+```{r}
+#set up state, parameters, and what to fit separately
+initialState  <- c(N=0.124)
+initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+free <- c("N",names(initialParams))
+differ <- c("K", "v", "m")
+
+#the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted combined for the two datasets
+totfree <- c(free[!(free %in% differ)], differ, differ)
+npar <- length(totfree)
+cat("Number of free parameters",npar)
+
+#Now set all instances of v in the total number of parameters to fit to 1, and all the other lower bounds to 0
+lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
+```
+
+
+Up to you to make fits of the red strain from A1 and red strain from B1 for experiment A and B combined. Use the code above together with fit and a list of the red A1 and red B1 dataset. Investigate what the result is if you let different parameters differ or not, and what that would mean biologically. Also compare the sum of squares of the residuals of the separate fits with these combined fits: do you do (much) worse, or better?
+
+```{r}
+#combinedFit = fit() #yours to fill in!
+
+
+#combinedFit$par #to see the fitted parameters
+#combinedFit$ssr #to get to the sum of squared residuals, for comparison with the original fits
+
+
+#######
+#Answer
+#######
+
+###
+### Differing in N, m, and q0
+###
+
+#set up state, parameters, and what to fit separately
+initialState  <- c(N=0.124)
+initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+free          <- c("N",names(initialParams))
+differ        <- c("m", "q0", "N")
+
+#the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted together for the two datasets
+totfree <- c(free[!(free %in% differ)], differ, differ)
+npar    <- length(totfree)
+cat("Number of free parameters",npar)
+
+#set the lower bound to 0 for all, then to 1 for all instances of v
+lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
+
+
+fitNMQZeroDiffer <- fit(data=list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptBFig3R), 
+                    free=free, differ=differ, fun=log, odes = model, state = initialState,
+                    parms = initialParams, lower=lower, pch=".",legend=FALSE, tstep=0.1, 
+                    main="red A1 & red B1, N, m, and q0 differing", add=TRUE, ymin = 0, ymax = 1)
+#summary(fitKVMDiffer) --> gives an error of covariance. This is because of the lag phase parameters, which we allowed to be fitted in our call.
+fitNMQZeroDiffer$ssr
+
+
+#compare with original two fits separately:
+summary(dataAndFitsFigureThree$FitexptAFig3R)
+dataAndFitsFigureThree$FitexptAFig3R$ssr
+
+#summary(dataAndFitsFigureThree$FitexptBFig3R) --> #can't fit separately well. 
+dataAndFitsFigureThree$FitexptBFig3R$ssr
+
+#fit of the model with 2 datasets is only very minimally worse in ssr than the two separate
+#note: should of course add up the residuals of the fit of Red (A1) and Red (B1) separately for a fair comparison!
+differenceSSR = abs(fitNMQZeroDiffer$ssr-(dataAndFitsFigureThree$FitexptAFig3R$ssr + dataAndFitsFigureThree$FitexptBFig3R$ssr))
+print(paste0("Difference in ssr between fitted together with parameters: ", paste(differ, collapse = ", "), "differing : ", differenceSSR))
+
+
+
+#Note: you needn't have done all the below options. They're just all there for you to browse!
+#Note: the below diffSSR variables all contain the differences of the combined fit to the two separate fits of Red and Red data from figure 3 A1 and B1
+
+###
+### Differing only in K and N
+###
+
+#order of parameters from fit: first one is for red A1, second one for red B1
+resultKDiffOnlyRedRed  = fitExpt3WithDiffer(differ = c("K", "N"), mode = "redred")
+fitKDiffOnlyRedRed     = resultKDiffOnlyRedRed$fit
+diffSSRKDiffOnlyRedRed = resultKDiffOnlyRedRed$diffSSR
+
+#Here you assume that the two differ in carrying capacity only. That's a bit strange: they're the same bacterial strain. Not a very useful thing to test!
+
+###
+### Differing only in v and N --> doesn't work, fit goes way off the rails
+###
+
+#resultVDiffOnlyRedRed  = fitExpt3WithDiffer(differ = c("v", "N"), mode = "redred")
+#fitVDiffOnlyRedRed     = resultVDiffOnlyRedRed$fit
+#diffSSRVDiffOnlyRedRed = resultVDiffOnlyRedRed$diffSSR
+
+###
+### Differing only in m and N
+###
+
+resultMDiffOnlyRedRed  = fitExpt3WithDiffer(differ = c("m", "N"), mode = "redred")
+fitMDiffOnlyRedRed     = resultMDiffOnlyRedRed$fit
+diffSSRMDiffOnlyRedRed = resultMDiffOnlyRedRed$diffSSR
+
+#This or the one below seem to be the most logical choice in this case. Only one lag parameter need differ!
+
+###
+### Differing only in q0 and N
+###
+
+resultQZeroDiffOnlyRedRed  = fitExpt3WithDiffer(differ = c("q0", "N"), mode = "redred")
+fitQZeroDiffOnlyRedRed     = resultQZeroDiffOnlyRedRed$fit
+diffSSRQZeroDiffOnlyRedRed = resultQZeroDiffOnlyRedRed$diffSSR
+
+#This works just fine, as does the above!
+
+###
+### Differing in K and v and N --> doesn't work, numerical integration fails
+###
+
+#resultKVDiffRedRed  = fitExpt3WithDiffer(differ = c("K", "v", "N"), mode = "redred") #This doesn't work --> get errors!
+#fitKVDiffRedRed     = resultKVDiffRedRed$fit
+#diffSSRKVDiffRedRed = resultKVDiffRedRed$diffSSR
+
+
+###
+### Differing in v and m and N
+###
+
+resultVMDiffRedRed  = fitExpt3WithDiffer(differ = c("v", "m", "N"), mode = "redred")
+fitVMDiffRedRed     = resultVMDiffRedRed$fit
+diffSSRVMDiffRedRed = resultVMDiffRedRed$diffSSR
+
+###
+### Differing in K and m and N
+###
+
+resultKMDiffRedRed  = fitExpt3WithDiffer(differ = c("K", "m", "N"), mode = "redred")
+fitKMDiffRedRed     = resultKMDiffRedRed$fit
+diffSSRKMDiffRedRed = resultKMDiffRedRed$diffSSR
+
+###
+### Differing in q0, m and N: 
+###
+
+resultQZeroMDiffRedRed  = fitExpt3WithDiffer(differ = c("q0", "m", "N"), mode = "redred")
+fitQZeroMDiffRedRed     = resultQZeroMDiffRedRed$fit
+diffSSRQZeroMDiffRedRed = resultQZeroMDiffRedRed$diffSSR
+
+
+```
+#Answer: all in all you see that only different N and q0 or m are fine. Only 2 different estimates, rather than 6! In this way we make much better use of the data than the authors did.
+
+
+# Question 4
+
+
+You've now fit the separate data and fit red and green together for experiment A. In the paper, what the authors do is say "Hey, if we first fit the separate growth curves, obtaining important parameters, and then grow the strains together to get data solely for fitting competition parameters (we already know the others from monoculture), we don't need frequency data!". This works well enough. However, in the end, they fit 14 parameters to their data: 12 from the separate monoculture (6 per strain), + 2 competition parameters. Are they not overfitting? To investigate, let's do two things:
+
+1. First fit the c1 and c2 parameters for  experiment A as the authors did it.
+2. Rather than fitting c1 and c2, see what happens if you fit with only only one c parameter.
+
+Let's start with one. You need to do the following:
+- Define the set of ODE equations for 2 variables. Copy the one from the beginning, and edit it to dN1 and dN2, renaming variables as needed.
+- Read in the data from experiment 4 (it is in the folder Fig4; called "2015-11-18_RG.csv" for experiment A)
+- Tell Grind to fit this to the data of experiment A for red and green strains, while saying that 12 parameters should not be estimated (you need to take these directly from the separate fits for red and green). Do this by:
+  - Setting `free = c(c1, c2)` in the `fit()` command. This tells Grind that it only needs to fit 2 parameters.
+  - Taking the fitted parameters from figure 3A1 and A2 (red and green), renaming the red ones to include a 1 at the end and the green ones to include a 2 (so they match your 2D ODE), and then combining those and adding c1 and c2 `combinedParams = c(params3ARed, params3AGreen, c1=1, c2=1)`. 
+  - Setting `tweak="nsol$OD=nsol$N1+nsol$N2"` in the `fit()` command. Look at the plot and make sure you understand what it does.
+  - Setting `upper=2` in the `fit()` command
+
+Hints:
+-Be sure to rename all parameters.
+-Assume that the initial concentrations of red and green in the mixed experiment are equal (that is, the initial state should be half the initial OD for N1, and half of it for N2)
+-Be sure that the data is a data frame (not a tibble). This might cause errors with deSolve etc. otherwise
+
+
+
+```{r}
+
+
+
+
+#######
+#Answer
+#######
+
+#NOTE: the colours in the fit are a bit misleading, red = red bacteria strain, blue = green bacteria strain, green = total OD in the model.
+
+# The 2D model
+
+model2 <- function(t, state, parms) {
+  with(as.list(c(state,parms)), {
+    a1 <- q01/(q01+exp(-m1*t)); a2 <- q02/(q02+exp(-m2*t))
+    dN1 <- r1*a1*N1*(1-(N1/K1)^v1-c2*(N2^v2)/(K1^v1))
+    dN2 <- r2*a2*N2*(1-(N2/K2)^v2-c1*(N1^v1)/(K2^v2))
+    return(list(c(dN1,dN2)))  
+  }) 
+}
+
+
+
+
+# Take the parameters from the single fits. Then rename to match model with 1 and 2.
+pR        <- dataAndFitsFigureThree$FitexptAFig3R$par[2:length(dataAndFitsFigureThree$FitexptAFig3R$par)]
+names(pR) <- paste(names(pR),"1",sep="")
+
+pG        <- dataAndFitsFigureThree$FitexptAFig3G$par[2:length(dataAndFitsFigureThree$FitexptAFig3G$par)]
+names(pG) <- paste(names(pG),"2",sep="")
+
+# Read in the data
+fig4Data  <- readr::read_csv("Fig4/2015-11-18_RG.csv")
+data4Fit  <- dplyr::bind_cols(fig4Data$Time, fig4Data$OD) %>% dplyr::rename(time = ...1, OD = ...2) %>% as.data.frame()
+
+# Set the initial state and fit
+p4        <- c(pR,pG,c1=1,c2=1)
+initialOD <- data4Fit[1,2]
+s4        <- c(N1=initialOD/2,N2=initialOD/2);s4  # assume the expt was started equally
+free4     <- c("c1","c2")
+fit4      <- fit(data4Fit, odes=model2, tweak="nsol$OD=nsol$N1+nsol$N2",free=free4, parms = p4, state = s4,
+             fun=log, lower=0, upper = 2, pch=".", legend=TRUE, tstep=0.1,
+             main="Fig 4 fit using monoculture param estimates from fig3 R and G for expt A",
+             ymin = 0, ymax = 1)
+
+summary(fit4)
+
+
+```
+
+Question: interpret what c1 and c2 mean biologically. Do you trust this judgement? Look particularly at the standard error of the fitted c parameters.
+
+#Answer: the Red strain (c1) experiences ~4 times less competition from green (c2) than vice versa (i.e. red is more hindered by its own population than by green; while green is hindered about 2 times as much by red as by itself). However, don't be fooled: this seemingly valid biological knowledge is wrong, as the next question (and the extreme parameter correlation in this fit) show(s). Note also the huge standard error in c2: it is all over the place!
+
+
+Now on to part 2: fitting with just one c parameter. The way to do this is to simply change the model and make it have only one c parameter used in the equation for N1 and N2, rather than c1 and c2, and then rerunning the fit. Don't forget to change `free` and the initial parameters. After that's done, compare the `$ssr` property of the fit with 1 c and c1 and c2.
+
+```{r}
+
+
+
+
+########
+#Answer
+########
+
+modelOneC <- function(t, state, parms) {
+  with(as.list(c(state,parms)), {
+    a1 <- q01/(q01+exp(-m1*t)); a2 <- q02/(q02+exp(-m2*t))
+    dN1 <- r1*a1*N1*(1-(N1/K1)^v1-c*(N2^v2)/(K1^v1))
+    dN2 <- r2*a2*N2*(1-(N2/K2)^v2-c*(N1^v1)/(K2^v2))
+    return(list(c(dN1,dN2)))  
+  }) 
+}
+
+
+# Set the initial state and fit
+p4OneC    <- c(pR,pG,c = 1)
+initialOD <- data4Fit[1,2]
+s4        <- c(N1=initialOD/2,N2=initialOD/2);s4  # assume the expt was started equally
+free4OneC <- c("c")
+fit4OneC  <- fit(data4Fit, odes=modelOneC, tweak="nsol$OD=nsol$N1+nsol$N2",free=free4OneC, parms = p4OneC, state = s4,
+             fun=log, lower=0, upper = 2, pch=".", legend=TRUE, tstep=0.1,
+             main="Fig 4 fit using monoculture param estimates from fig3 R and G for expt A",
+             ymin = 0, ymax = 1)
+
+summary(fit4OneC)
+
+
+```
+
+Question: look at your results, both the fitted value of the c parameter and the (difference in) residual sum of squares. Do you think a single or 2 c parameters are the way to go here? Why?
+
+
+#Answer: You see that the estimate for c is almost exactly the same as it was before for c1. ~0.6022 versus ~0.5997. What gives? Well, this competition only comes into play late in the game: in reality, the first strain (red) grows much faster than second strain (green). Hence, c2 is not identifiable because green is basically gone by the time competition starts being a real pain (near carrying capacity), so the fit just guesses something arbitrarily. In other words: at first growth is not limited by competition, and when that starts being the case the green bacteria are already mostly gone. 
+
+#The sum of squared residuals is not meaningfully different from when there were 2 c parameters, so you can conclude that 1 c parameter is the way to go here!
+
+
+# Extra Question 5: Fitting red (A1) and green (A2) together:
 
 ```{r}
 #set up state, parameters, and what to fit separately
@@ -405,135 +683,8 @@ print(paste("Difference between fit with separate parameter estimation of K, v, 
 
 
 
-#In sum, you'd think that either only letting K, v and m, or even only K and m differ between red and green in experiment a and fitting the data together would be best.
+#In sum, you'd think that either only letting K, v and m, or even only K and m (barely a difference then) differ between red and green in experiment a and fitting the data together would be best. You can do with equal q0, r, and N.
 ```
-
-
-# Question 4
-
-
-You've now fit the separate data and fit red and green together for experiment A. In the paper, what the authors do is say "Hey, if we first fit the separate growth curves, obtaining important parameters, and then grow the strains together to get data solely for fitting competition parameters (we already know the others from monoculture), we don't need frequency data!". This works well enough. However, in the end, they fit 14 parameters to their data: 12 from the separate monoculture (6 per strain), + 2 competition parameters. Are they not overfitting? To investigate, let's do two things:
-
-1. First fit the c1 and c2 parameters for  experiment A as the authors did it.
-2. Rather than fitting c1 and c2, see what happens if you fit with only only one c parameter.
-
-Let's start with one. You need to do the following:
-- Define the set of ODE equations for 2 variables. Copy the one from the beginning, and edit it to dN1 and dN2, renaming variables as needed.
-- Read in the data from experiment 4 (it is in the folder Fig4; called "2015-11-18_RG.csv" for experiment A)
-- Tell Grind to fit this to the data of experiment A for red and green strains, while saying that 12 parameters should not be estimated (you need to take these directly from the separate fits for red and green). Do this by:
-  - Setting `free = c(c1, c2)` in the `fit()` command. This tells Grind that it only needs to fit 2 parameters.
-  - Taking the fitted parameters from figure 3A1 and A2 (red and green), renaming the red ones to include a 1 at the end and the green ones to include a 2 (so they match your 2D ODE), and then combining those and adding c1 and c2 `combinedParams = c(params3ARed, params3AGreen, c1=1, c2=1)`. 
-  - Setting `tweak="nsol$OD=nsol$N1+nsol$N2"` in the `fit()` command. Look at the plot and make sure you understand what it does.
-  - Setting `upper=2` in the `fit()` command
-
-Hints:
--Be sure to rename all parameters.
--Assume that the initial concentrations of red and green in the mixed experiment are equal (that is, the initial state should be half the initial OD for N1, and half of it for N2)
--Be sure that the data is a data frame (not a tibble). This might cause errors with deSolve etc. otherwise
-
-
-
-```{r}
-
-
-
-
-#######
-#Answer
-#######
-
-#NOTE: the colours in the fit are a bit misleading, red = red bacteria strain, blue = green bacteria strain, green = total OD in the model.
-
-# The 2D model
-
-model2 <- function(t, state, parms) {
-  with(as.list(c(state,parms)), {
-    a1 <- q01/(q01+exp(-m1*t)); a2 <- q02/(q02+exp(-m2*t))
-    dN1 <- r1*a1*N1*(1-(N1/K1)^v1-c2*(N2^v2)/(K1^v1))
-    dN2 <- r2*a2*N2*(1-(N2/K2)^v2-c1*(N1^v1)/(K2^v2))
-    return(list(c(dN1,dN2)))  
-  }) 
-}
-
-
-
-
-# Take the parameters from the single fits. Then rename to match model with 1 and 2.
-pR        <- dataAndFitsFigureThree$FitexptAFig3R$par[2:length(dataAndFitsFigureThree$FitexptAFig3R$par)]
-names(pR) <- paste(names(pR),"1",sep="")
-
-pG        <- dataAndFitsFigureThree$FitexptAFig3G$par[2:length(dataAndFitsFigureThree$FitexptAFig3G$par)]
-names(pG) <- paste(names(pG),"2",sep="")
-
-# Read in the data
-fig4Data  <- readr::read_csv("Fig4/2015-11-18_RG.csv")
-data4Fit  <- dplyr::bind_cols(fig4Data$Time, fig4Data$OD) %>% dplyr::rename(time = ...1, OD = ...2) %>% as.data.frame()
-
-# Set the initial state and fit
-p4        <- c(pR,pG,c1=1,c2=1)
-initialOD <- data4Fit[1,2]
-s4        <- c(N1=initialOD/2,N2=initialOD/2);s4  # assume the expt was started equally
-free4     <- c("c1","c2")
-fit4      <- fit(data4Fit, odes=model2, tweak="nsol$OD=nsol$N1+nsol$N2",free=free4, parms = p4, state = s4,
-             fun=log, lower=0, upper = 2, pch=".", legend=TRUE, tstep=0.1,
-             main="Fig 4 fit using monoculture param estimates from fig3 R and G for expt A",
-             ymin = 0, ymax = 1)
-
-summary(fit4)
-
-
-```
-
-Question: interpret what c1 and c2 mean biologically. Do you trust this judgement? Look particularly at the standard error of the fitted c parameters.
-
-#Answer: the Red strain (c1) experiences ~4 times less competition from green (c2) than vice versa (i.e. red is more hindered by its own population than by green; while green is hindered about 2 times as much by red as by itself). However, don't be fooled: this seemingly valid biological knowledge is wrong, as the next question (and the extreme parameter correlation in this fit) show(s). Note also the huge standard error in c2: it is all over the place!
-
-
-Now on to part 2: fitting with just one c parameter. The way to do this is to simply change the model and make it have only one c parameter used in the equation for N1 and N2, rather than c1 and c2, and then rerunning the fit. Don't forget to change `free` and the initial parameters. After that's done, compare the `$ssr` property of the fit with 1 c and c1 and c2.
-
-```{r}
-
-
-
-
-########
-#Answer
-########
-
-modelOneC <- function(t, state, parms) {
-  with(as.list(c(state,parms)), {
-    a1 <- q01/(q01+exp(-m1*t)); a2 <- q02/(q02+exp(-m2*t))
-    dN1 <- r1*a1*N1*(1-(N1/K1)^v1-c*(N2^v2)/(K1^v1))
-    dN2 <- r2*a2*N2*(1-(N2/K2)^v2-c*(N1^v1)/(K2^v2))
-    return(list(c(dN1,dN2)))  
-  }) 
-}
-
-
-# Set the initial state and fit
-p4OneC    <- c(pR,pG,c = 1)
-initialOD <- data4Fit[1,2]
-s4        <- c(N1=initialOD/2,N2=initialOD/2);s4  # assume the expt was started equally
-free4OneC <- c("c")
-fit4OneC  <- fit(data4Fit, odes=modelOneC, tweak="nsol$OD=nsol$N1+nsol$N2",free=free4OneC, parms = p4OneC, state = s4,
-             fun=log, lower=0, upper = 2, pch=".", legend=TRUE, tstep=0.1,
-             main="Fig 4 fit using monoculture param estimates from fig3 R and G for expt A",
-             ymin = 0, ymax = 1)
-
-summary(fit4OneC)
-
-
-```
-
-Question: look at your results, both the fitted value of the c parameter and the (difference in) residual sum of squares. Do you think a single or 2 c parameters are the way to go here? Why?
-
-
-#Answer: You see that the estimate for c is almost exactly the same as it was before for c1. ~0.6022 versus ~0.5997. What gives? Well, this competition only comes into play late in the game: in reality, the first strain (red) grows much faster than second strain (green). Hence, c2 is not identifiable because green is basically gone by the time competition starts being a real pain (near carrying capacity), so the fit just guesses something arbitrarily. In other words: at first growth is not limited by competition, and when that starts being the case the green bacteria are already mostly gone. 
-
-#The sum of squared residuals is not meaningfully different from when there were 2 c parameters, so you can conclude that 1 c parameter is the way to go here!
-
-
-
 
 
 

@@ -276,3 +276,81 @@ fitExpt3AWithDiffer           = function(differ = c("K", "v", "m")) {
   
   return(list(fit = fitDiffer, diffSSR = differencesSSR))
 }
+
+
+
+
+fitExpt3WithDiffer           = function(differ = c("K", "v", "m"), mode = "redgreen") {
+  
+  cat("   \n")
+  cat("---\n")
+  print("Differ for this call: ")
+  print(differ)
+  cat("---\n")
+  cat("   \n")
+  #set up state, parameters, and what to fit separately
+  initialState  <- c(N=0.124)
+  initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+  free <- c("N",names(initialParams))
+  
+  #the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted together for the two datasets
+  totfree <- c(free[!(free %in% differ)], differ, differ)
+  npar <- length(totfree)
+  cat("Number of free parameters",npar, "\n")
+  
+  #set the lower bound to 0 for all, then to 1 for all instances of v
+  lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
+  
+  if (mode == "redgreen") {
+    #fit red and green from exptA together
+    dataToUse = list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptAFig3G)
+    stringTitle = "red (Fig 3 A1) and green (Fig 3 A2)"
+  } else if (mode == "redred") {
+    #fit red and red from A and B together
+    dataToUse = list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptBFig3R)
+    stringTitle = "red (Fig 3 A1) and red (Fig 3 B1)"
+  } else {
+    stop("Wrong argument. Mode can be \"redgreen\" for fig 3 A1 and A2 together, or \"redred\" for fig 3 A1 and B1 together.")
+  }
+  
+  fitDiffer <- fit(data=dataToUse, 
+                   free=free, differ=differ, fun=log, odes = model, state = initialState,
+                   parms = initialParams, lower=lower, pch=".",legend=FALSE, tstep=0.1, 
+                   main=paste(stringTitle, paste(differ, collapse = ", "), "differing"), add=TRUE, ymin = 0, ymax = 1)
+  summary(fitDiffer)
+  fitDiffer$ssr
+  
+  
+  if (mode == "redgreen") {
+    
+    #compare with original two fits separately:
+    summary(dataAndFitsFigureThree$FitexptAFig3R)
+    dataAndFitsFigureThree$FitexptAFig3R$ssr
+    
+    summary(dataAndFitsFigureThree$FitexptAFig3G)
+    dataAndFitsFigureThree$FitexptAFig3G$ssr
+    
+    #fit of the model with 2 datasets is only very minimally worse in ssr than the two separate
+    #note: should of course add up the residuals of the fit of Red and Green separately for a fair comparison!
+    differencesSSR = abs(fitDiffer$ssr-(dataAndFitsFigureThree$FitexptAFig3R$ssr + dataAndFitsFigureThree$FitexptAFig3G$ssr))
+    print(paste0("Difference in ssr between fitted together with parameter(s): ", paste(differ, collapse = ", "), " differing : ", differencesSSR))
+    
+  } else if (mode == "redred") {
+    
+    #compare with original two fits separately:
+    summary(dataAndFitsFigureThree$FitexptAFig3R)
+    dataAndFitsFigureThree$FitexptAFig3R$ssr
+    
+    summary(dataAndFitsFigureThree$FitexptBFig3R)
+    dataAndFitsFigureThree$FitexptBFig3R$ssr
+    
+    #fit of the model with 2 datasets is only very minimally worse in ssr than the two separate
+    #note: should of course add up the residuals of the fit of Red and Green separately for a fair comparison!
+    differencesSSR = abs(fitDiffer$ssr-(dataAndFitsFigureThree$FitexptAFig3R$ssr + dataAndFitsFigureThree$FitexptBFig3R$ssr))
+    print(paste0("Difference in ssr between fitted together with parameter(s): ", paste(differ, collapse = ", "), " differing : ", differencesSSR))
+    
+  }
+  
+  
+  return(list(fit = fitDiffer, diffSSR = differencesSSR))
+}
