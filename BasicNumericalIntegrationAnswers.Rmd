@@ -18,44 +18,35 @@ timestep = 0.5
 time <- seq(0, 10, by = timestep)
 # initial condition
 x0 <- 0.1
-## The function to be integrated (right-hand expression of the derivative above)
+## The differential equation to be integrated 
 f <- function(x){x * (1.-x)}
     
-## An empty R vector to store the results
+## An empty R vector to store the integration results
 x <- c()
-## Store the initial condition in the first position of the vector
+## Store the initial condition in the first position of this vector
 x[1] <- x0
     
-# loop over time: approximate the function at each time step
-
-#timing for question c
-startTime = proc.time() 
+# loop over time: approximate the solution at each time step
 for (i in 1:(length(time)-1)){
   x[i+1] = x[i] + timestep * f(x[i])
 }
-#timing for question c
-calculationTime = proc.time() - startTime
-
     
-# Base R plotting 
+# Basic R plotting 
 plot(x~time)
+lines(x~time, type = "l", lty = 2, add = TRUE)
 curve(0.1 * exp(x)/(1+0.1*(exp(x)-1.)), add=T)
-legend("topleft", c("approximation", "analytical"), 
-       pch=c(1,NA), lty=c(NA,1))
+legend("topleft", c("approximation", "analytical"), pch=c(1,NA), lty=c(NA,1))
 
-#ggplot plotting
+#Fancier ggplot plotting
 dataFramePlot <- data.frame(x_value = c(x, 0.1 * exp(time)/(1+0.1*(exp(time)-1.))),
-                           time = time,
-                           solution_method = c(rep("Approximation", length(x)), rep("Analytical", length(x)))
+time = time, solution_method = c(rep("Approximation", length(x)), rep("Analytical", length(x)))
                            )
 
-ggplot2::ggplot(data = dataFramePlot,
-                aes (x = time, y = x_value, colour = solution_method)) + 
+ggplot2::ggplot(data = dataFramePlot,aes (x = time, y = x_value, colour = solution_method)) + 
   geom_point(data = dataFramePlot %>% subset(solution_method == "Approximation"), size = 2) +
+geom_line(data = dataFramePlot %>% subset(solution_method == "Approximation"), size = 1.2, linetype='dashed') + 
   geom_line(data = dataFramePlot %>% subset(solution_method != "Approximation"), size = 1.2) +
-  theme_bw() +
-  ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) +
-  theme(plot.title = element_text(hjust = 0.5)) +
+  theme_bw() + ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) + theme(plot.title = element_text(hjust = 0.5)) +
   scale_color_brewer(palette = "Paired")
   
   
@@ -65,15 +56,17 @@ ggplot2::ggplot(data = dataFramePlot,
 
 ```{r}
 ##answer question b:
-#need the absolute difference between the approximate and analytical solution at each time step, then take the sum of that.
+#first make a vector storing differences per timestep
 differences = abs(x - 0.1 * exp(time)/(1+0.1*(exp(time)-1.)))
+#then compute sum of these differences
 totalDifferences = sum(differences)
+#print these differences
 print(totalDifferences)
 ```
 
 
 ```{r}
-#In coding, you should observe DRY, Don't Repeat Yourself. Hence, we put the code into a function that allows us to change the timestep and plot the results. We'll run this with a large and a small time step. 
+#In coding, you should observe DRY, Don't Repeat Yourself (as when later needing to change something you need to remember all the locations to do this making the risk for errors to occur large). Hence, in this answer code we put the code into an external function (which you can savely ignore) that allows us to change the timestep, call it again and plot the results. We'll run this with a large and a small time step.  Of course in your own code you can simply change the value of your timestep and rerun the same code.
 source("HelperFunctionsAnswerFile.R")
 
 ####################
@@ -81,29 +74,22 @@ source("HelperFunctionsAnswerFile.R")
 ####################
 
 #for time step is 2
-resultLargeStep = runSimpleNumericalIntegration(timeStep = 2, maxTime = 500)
+resultLargeStep = runSimpleNumericalIntegration(timeStep = 2, maxTime = 50)
 resultLargeStep$timeExpended
 resultLargeStep$Totdifferences
-#it is clear that the integration is going completely awry here, overshooting and undershooting a lot.
-#The summed difference is qite large (~9.65)
-
-#you can see this even better if you only perform a few steps.
-resultLargeStepShortInterval = runSimpleNumericalIntegration(timeStep = 2, maxTime = 6)
+#you see that the numerical solution now oscillates around the analytical
+#solution, at one timestep overshooting and the next undershooting the
+#proper values. Also, the summed difference is quite large (~2.34)
 
 #If you set the time step to be small things turn out a lot better.
-resultSmallStep = runSimpleNumericalIntegration(timeStep = 0.01, maxTime = 500)
+resultSmallStep = runSimpleNumericalIntegration(timeStep = 0.01, maxTime = 50)
 resultSmallStep$timeExpended
 resultSmallStep$Totdifferences
-#Here the integration works fine. The total sum of differences is also much smaller: ~0.34
+#Here the integration works fine. The numerical solution closely follows
+#the analytical solution. Also, the total sum of differences is much smaller: ~0.34
 
 ```
 
 
-####################
-##Answer question d:
-####################
 
-#This is already shown in the code above for answer A. For smaller time steps and longer time spans, execution time increases. It is not a linear relationship, which you would expect. This is because all sorts of things happen under the hood that muddle the direct dependency.
-
-#for more intense timing needs, the package microbenchmark can be used. However, because the calculations here are so quick, execution time is sometimes difficult to measure and that would be overkill in this situation. Good to remember for later though.
 

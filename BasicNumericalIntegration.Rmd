@@ -13,44 +13,44 @@ p_load(tidyverse)
 
 
 ```{r}
-# time intervals: a sequence from zero to ten at timestep steps
+# integration time: a sequence from zero to ten at timestep steps
 timestep = 0.5
 time <- seq(0, 10, by = timestep)
-# initial condition
+# initial condition (starting value of the variable at time zero)
 x0 <- 0.1
-## The function to be integrated (right-hand expression of the derivative above)
+# The differential equation to be integrated (see tutorial)
 f <- function(x){x * (1.-x)}
     
-## An empty R vector to store the results
+## An empty R vector to store the integration results (x value per timestep)
 x <- c()
-## Store the initial condition in the first position of the vector
+## Store the initial condition in the first position of this vector
 x[1] <- x0
     
-# loop over time: approximate the function at each time step
+# loop over time: approximate the solution at each time step
 for (i in 1:(length(time)-1)){
   x[i+1] = x[i] + timestep * f(x[i])
 }
     
-# Base R plotting 
+
+# Basic R plotting 
+#plot the obtained x values over time
 plot(x~time)
+lines(x~time, type = "l", lty = 2, add = TRUE)
+#add to the plot the known numerical solution
 curve(0.1 * exp(x)/(1+0.1*(exp(x)-1.)), add=T)
-legend("topleft", c("approximation", "analytical"), 
-       pch=c(1,NA), lty=c(NA,1))
+#add a legend
+legend("topleft", c("approximation", "analytical"), pch=c(1,NA), lty=c(NA,1))
 
-#ggplot plotting
-dataFramePlot <- data.frame(x_value = c(x, 0.1 * exp(time)/(1+0.1*(exp(time)-1.))),
-                           time = time,
-                           solution_method = c(rep("Approximation", length(x)), rep("Analytical", length(x)))
-                           )
 
-ggplot2::ggplot(data = dataFramePlot,
-                aes (x = time, y = x_value, colour = solution_method)) + 
-  geom_point(data = dataFramePlot %>% subset(solution_method == "Approximation"), size = 2) +
-  geom_line(data = dataFramePlot %>% subset(solution_method != "Approximation"), size = 1.2) +
-  theme_bw() +
-  ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) +
-  theme(plot.title = element_text(hjust = 0.5))
-  
+#Fancier ggplot plotting
+#again plotting both obtained x values and numerical solution over time
+#and add legends
+dataFramePlot <- data.frame(x_value = c(x, 0.1 * exp(time)/(1+0.1*(exp(time)-1.))), time = time, solution_method = c(rep("Approximation", length(x)), rep("Analytical", length(x))))
+
+ggplot2::ggplot(data = dataFramePlot, aes (x = time, y = x_value, colour = solution_method)) + geom_point(data = dataFramePlot %>% subset(solution_method == "Approximation"), size = 2) +
+geom_line(data = dataFramePlot %>% subset(solution_method == "Approximation"), size = 1.2, linetype='dashed') + 
+geom_line(data = dataFramePlot %>% subset(solution_method != "Approximation"), size = 1.2) + theme_bw() + ggtitle(paste0("Approximate versus analytical solution of f(x) = x*(1-x) for time step of ", timestep, "")) + theme(plot.title = element_text(hjust = 0.5))
+ 
   
   
 ```
