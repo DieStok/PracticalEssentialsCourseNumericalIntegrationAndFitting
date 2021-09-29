@@ -268,12 +268,19 @@ free4     <- c("c1","c2")
 
 #Q4C answer:
 #to do the fitting
-fit4      <- fit(data4Fit, odes=model2, tweak="nsol$OD=nsol$N1+nsol$N2",free=free4, parms = p4, state = s4,
+fit4      <- fit(data4Fit, odes=model2, tweak="nsol$OD=nsol$N1+nsol$N2;nsol$N1=nsol$N1/nsol$OD;nsol$N2=nsol$N2/nsol$OD",
+                 free=free4, parms = p4, state = s4,
              fun=log, lower=0, upper = 2, pch=".", legend=TRUE, tstep=0.1,
-             main="Fig 4 fit using monoculture param estimates from fig3 R and G for expt A",
-             ymin = 0, ymax = 1)
+             main="Fig 4 fit using monoculture param estimates from fig3 R and G for expt A\n (fraction of total OD per strain)",
+             ymin = 0, ymax = 1, timeplot = TRUE, ylab = "Fraction of total OD (Density)")
 #note the differences in line colors compared to the paper, unfortunately it is not easy to fix this.
-#note that we use the tweak: OD=N1+N2 to plot as extra the total density from N1 and N2 summed
+#note that we use the tweak: OD=N1+N2 to plot as extra the total density from N1 and N2 summed, and also set N1 and N2 to be parts of the total population summing up to one. This makes it more similar to figure 5. If you don't do that, the plot looks like this:
+
+fit4NotFreq      <- fit(data4Fit, odes=model2, tweak="nsol$OD=nsol$N1+nsol$N2",
+                 free=free4, parms = p4, state = s4,
+             fun=log, lower=0, upper = 2, pch=".", legend=TRUE, tstep=0.1,
+             main="Fig 4 fit using monoculture param estimates from fig3 R and G for expt A\n (OD per strain)",
+             ymin = 0, ymax = 1, timeplot = TRUE, ylab = "OD (Density)")
 
 #to obtain parameter values and fit statistics
 summary(fit4)
@@ -287,7 +294,8 @@ summary(fit4)
 #Results are quite shaky: the standard deviation for c2 is huge, and c1 and c2 are strongly anti-correlated #(meaning that if for one you obtain a higher than for the other you obtain a lower value) suggesting they
 #are strongly coupled.
 #This problem can be understood from the following: competition only becomes relevant once population levels get 
-#larger, and once strain1 has reached a sufficient level strain2 numbers have dropped already significantly #making it hard to estimate c2. 
+#larger, and once strain1 has reached a sufficient level strain2 numbers have dropped already significantly 
+#making it hard to estimate c2. 
 ```
 
 
