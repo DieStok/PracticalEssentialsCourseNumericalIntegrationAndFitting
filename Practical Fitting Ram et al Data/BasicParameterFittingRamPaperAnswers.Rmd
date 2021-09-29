@@ -5,12 +5,6 @@ output:
     df_print: paged
 ---
 
-We now move from numerical integration of a given formula to fitting parameters to data. This means we will require a few new tools. For this we will use a programme/set of R functions called Grind. It may cause you some level of amusement, nay, it might make you positively giddy and gay, to know that the required functions are hence in the file grind.R. Grind is a wrapper around the DeSolve library that you used on Tuesday while performing runge-kutta 23 numerical integration, and some others. You didn't really have to change much about the formula, parameters, and state there, but now you will have to do so, so let's get you up to speed!
-
-# Question 1
-
-Run through this tutorial until you get to the part where you are asked to change parameters and define a new function.
-
 ```{r, include= FALSE}
 #loading required packages and sourcing Grind
 if(!require(pacman)) {
@@ -20,128 +14,18 @@ source("grind.R")
 source("../HelperFunctionsAnswerFile.R")
 
 ```
-Let's load the data for the red strain in experiment A1 (so the data that they fit for Figure 3 A1). Then, we will fit the parameters of the growth curve.
+#Question 2
+Before we start to fit, let us have a look at the data
 
 ```{r}
-fig3RA <- readr::read_csv("Fig3/2015-11-18_R.csv") %>% dplyr::rename(Identifier = ...1)
-head(fig3RA)
+# The 3 experiments are indexed by their date:
+exptA <- "2015-11-18"  #Experiment A
+exptB <- "2015-12-14"  #Experiment B
+exptC <- "2016-01-06"  #Experiment C
 
-```
-Question: Look at the data we just loaded in. Which variables do you think we will be using for the fitting?
-
-#Answer: That would be Time and OD. The identifiers are unimportant. We don't care about the Row and Column of the wells the bacteria were growing in, nor do the tiny fluctuations in the temperature value measured or the Cycle Nr. matter much. We just want to fit the growth curve, which is Time and OD. 
-
-Before we fit the actual data, let's go over the syntax Grind and deSolve use. Below, I define a function called model. This function can be used to calculate the values of the differential equation dN at different time points through numerical integration, or for fitting later. As arguments it uses t (for a vector of time points), state (for a vector containing the starting state of the variables in the system, think R0 and B0 from before), and parms (for a vector containing the parameters of the system). State and parameters should be named vectors. This means that if you use a parameter v in your formula, you want the name of that value in the vector parms to be "v". You can also change these names after making a vector if you want. You see an example of making a named vector and renaming it below. 
-
-
-```{r}
-
-model <- function(t, state, parms) {
-  with(as.list(c(state,parms)), {
-    a <- q0/(q0+exp(-m*t))
-    dN <- r*a*N*(1-(N/K)^v)
-    return(list(dN))  
-  }) 
-}
-
-parametersForFitting = c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
-print(names(parametersForFitting))
-names(parametersForFitting)[1] = "suchChangeMuchW0W"
-print(names(parametersForFitting))
-#let's change it back. No Venetian nobles allowed on my watch!
-names(parametersForFitting)[1] = "v"
-
-```
-the with(as.list(c(state, parms))) does nothing more than make these names available without having to write parms["v"] every time you want to use v from the parameters vector, and parms["q0"] every time you want to use q0. Then, there's the part where actual calculations are done and the value of the differential equation for a given time point is calculated. As you can see, you are free to calculate other (time-dependent) parameters which are not the differential equation within this section. a is an example of that. Then there's the differential equation. Finally, the function returns a list of the differential equation results for the input timepoint(s). Let's use this equation with Grind, first for numerical integration of the ODE we defined above.
-
-```{r}
-#First, normal numerical integration without any fitting. These are nonsense parameters!
-
-#We need a starting amount of bacteria
-initialState         = c(N = 0.124) #units are OD.
-parametersForFitting = c(v = 1.22, r = 1.05, q0 = 0.0023, m = 2, K = 0.6)
-
-
-#numerically integrate the model, from time 1 to 100
-#use as the initial values (the state vector) initialState
-#find the parameters in the named vector parametersForFitting
-#the equation for the ODE/calculations we want to do are in the function called model
-run(tmax = 100, tstep = 1,
-    state = initialState,
-    parms = parametersForFitting,
-    odes = model
-    )
-
-```
-You see that Grind automatically plots and adds a legend. Pretty nifty. If you are a ggplot purist, then you can do the following:
-
-```{r}
-#still plots, can make it not do that by adding timeplot = FALSE to the run command call.
-#draw = points gives scatter plot rather than line plot
-#table = TRUE makes run return the results from the numerical integration in a handy table.
-grindResultsTimeCourse = run(tmax = 100, tstep = 1,
-                              state = initialState,
-                              parms = parametersForFitting,
-                              odes = model, table = TRUE, draw = points
-                            )
-
-print(head(grindResultsTimeCourse))
-ggplot(grindResultsTimeCourse, aes(x= time, y = N)) +
-  geom_point(colour = "red") +
-  theme_bw()
-```
-Note that drawing points gives us a fairer view of what we are actually calculating: in the first 7 time steps the bacterial population rises rapidly to the carrying capacity. The rest of the time course just remains at ~0.6. Not really useful, but luckily silicon doesn't care. You might have noticed that because grind is just a collection of functions that you source (not a package), it's not as easy to look at the function parameters. You can always open grind.R and search for the run function to see the parameters it has and play around, or look at the tutorial that explains the functions and their uses here: https://tbb.bio.uu.nl/rdb/grindR/tutorial.pdf . 
-
-* Question: Before you go on to fitting, perform the exercises in Question 1 in the .pdf given to you. Change around the K, v, and m and q0 parameters and try to interpret what they mean, and plot the function you are required to write. You can use the code block below.
-
-```{r}
-#First, normal numerical integration without any fitting.
-
-# We need a starting amount of bacteria
-initialState         = c(N = 0.124) #units are OD.
-# parameters
-parametersForFitting = c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
-
-
-#numerically integrate the model, from time 1 to 100
-#use as the initial values (the state vector) initialState
-#find the parameters in the named vector parametersForFitting
-#the equation for the ODE/calculations we want to do are in the function called model
-run(tmax = 100, tstep = 1,
-    state = initialState,
-    parms = parametersForFitting,
-    odes = model
-    )
-
-#function for q0/q0+e^(-m*t)
-fDelay <- function(t, params = parametersForFitting) {params["q0"]/(params["q0"]+exp(-params["m"]*t))}
-
-#make sure to give it a vector of times
-times = seq(1, 100, 0.5)
-output = fDelay(times)
-
-dataFDelay = data.frame(time = times, output = output)
-ggplot(dataFDelay, aes(x = time, y = output)) + geom_point() +
-  ggtitle("Delay equation values over time")
-
-
-```
-
-
-
-
-
-
-# Question 2
-
-
-Now, on to fitting! First, let's plot the data for figure 3, 4 and 5 for experiment A, so you know what we'll be working on.
-
-
-```{r}
-exptA = "2015-11-18"
-fig3RA <- read.csv(paste("Fig3/",exptA,"_R.csv",sep="")) # Red
-fig3GA <- read.csv(paste("Fig3/",exptA,"_G.csv",sep="")) # Green
+#Let us read in data of Figure 3 for experiment A
+fig3RA <- read.csv(paste("Fig3/",exptA,"_R.csv",sep="")) # Red strain
+fig3GA <- read.csv(paste("Fig3/",exptA,"_G.csv",sep="")) # Green strain
 plot(fig3RA$Time, fig3RA$OD, ylim=c(0,0.8),col="red",pch=".",xlab="Time (hr)",ylab="OD", main = "Figure 3 A1 (red) and A2 (green)")
 points(fig3GA$Time, fig3GA$OD, ylim=c(0,0.8),col="green",pch=".")
 
@@ -153,55 +37,121 @@ fig5G <- fig5[fig5$Strain=="Green",]
 fig5R <- fig5[fig5$Strain=="Red",]
 plot(fig5G$time, fig5G$freq_mean, ylim=c(0,1), col="green",xlab="Time (hr)", ylab="Frequency", main =  "Figure 5 A")
 points(fig5R$time, fig5R$freq_mean, col="red")
+
+#Q2A answer:
+#Note that due to the 30-32 replicates, in Fig 3 and Fig 4 you see for each timepoint a line of points with each point corresponding to a single measurement. Apparently in Fig5 mean values are used instead.
+
 ```
 
 
-To fit, we need to do two things:
-1. Tell Grind which parameters we would like to fit to the data
-2. Tell Grind what the lower (or upper) bounds are for certain parameters, if we want them.
+Now to fit we first need to define the model
 
-Regarding the second point, you can imagine that we don't want negative growth speeds. That would be a case for bounding to 0.
+```{r}
 
-```{r, warning=FALSE}
+model <- function(t, state, parms) {
+  with(as.list(c(state,parms)), {
+    a <- q0/(q0+exp(-m*t))
+    dN <- r*a*N*(1-(N/K)^v)
+    return(list(dN))  
+  }) 
+}
 
-#we make a character vector of all the variables we want Grind to fit. Here, that's N and all the parameters.
-free <- c("N",names(parametersForFitting))
-#for the lower bound, we bound everything at 0, and v at 1. A decelaration parameter that becomes lower than 1 would accelerate given the formula, so that would be strange
+s <- c(N=0.124)
+p <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+```
+
+
+To fit, we need to do two more things:
+1. Tell Grind which parameters we would like to fit to the data. All other parameters will be kept constant, at a previously defined value.
+2. Tell Grind what the lower and/or upper bounds are for certain parameters. E.g. we don't want negative growth speeds, so r would need a lower bound of 0. Similarly, Ram et al., specifiy that v should be equal or larger than 1, so that would require a lower bound of 1. If nothing is specified the parameter fit can take on any value.
+
+```{r}
+#N + all the parameters are free to be fitted. 
+free <- c("N",names(p))
+#for the lower bound, we bound everything at 0, and v at 1.
+#so you first use the length of the vector free to first set lower bound for all parameters to zero
+#next for parameter v specifically you set the lower bound to 1
 lower <- rep(0, length(free)); lower[match("v",free)] <- 1; lower  # set lower bounds
 
 
 #to fit, Grind wants a data frame with time and the variables it needs to fit. Note how we rename OD to N to be consistent.
 data3RA <- as.data.frame(cbind(fig3RA$Time,fig3RA$OD)); names(data3RA) <- c("time","N")
 
-#now we fit the parameters. fun = log tells the fitting that we want to fit the log of the data, not the actual data. The other parameters are self-explanatory. Note that we also start from some initial parameter values and improve the fit from there. For now, we'll just use the parameters from above.
-fit3RAlog  <- fit(data3RA, state = initialState, odes = model, parms = parametersForFitting,
+#now we fit the parameters. fun = log tells the fitting that we want to fit the log of the data, not the actual data. The other parameters are self-explanatory. Note that we also start from some initial guess for the parameter values and try to improve the fit from there. For now, we'll just use the parameters from above.
+fit3RAlog  <- fit(data3RA, state = s, odes = model, parms = p,
                free=free, fun=log, lower=lower, pch=".",
                legend=FALSE, tstep=0.1, main="Fig 3 a red monoculture (fun=log)",
                ymin = 0, ymax = 1
                )
-summary(fit3RAlog)
+#in this fit, you can get at the fitted parameters using $par
+print(fit3RAlog$par)
 
-fit3RA     <- fit(data3RA, state = initialState, odes = model, parms = parametersForFitting,
+
+#Q2B answer: not doing the log
+fit3RA     <- fit(data3RA, state = s, odes = model, parms = p,
                free=free, lower=lower, pch=".",
                legend=FALSE, tstep=0.1, main="Fig 3 a red monoculture",
                ymin = 0, ymax = 1
                )
-summary(fit3RA)
-
-#in this fit, you can get at the fitted parameters using $par
-print(fit3RA$par)
+#In the article the data is not log transformed
+#You see that in this particular case taking a log-transform does not impact the quality of the fit much. Still one can imagine that a log-transform is important to weigh a difference of 0.1 relative to a mean of 1 equally heavily as a difference of 10 to a mean of 100. Also, one would want many small differences to count equally as a single large difference, for this a log transform also helps.
 ```
 
-You see that you obtain a rather nice fit to this data. Do note that you are fitting quite a lot of parameters to little data. Be sure to go over the summary of the fitting and try to understand what things mean. What do you think parameter correlation stands for? What do higher standard errors for the parameters indicate? Think about this for a moment, and ask us if you have no clue! Before you go on, one more question:
+Now look at fitting statistics
+```{r}
+#Q2C&D answer
+summary(fit3RAlog)
 
-Question: Above, we fit the log of the data (so the log of the OD of bacterial density). As a comparison, we also did the fitting without taking the log. You can see there is a slight difference in the fits. Why do you think we prefer the log? What characteristics of taking the log would you think could improve the fit we get?
+#Q2C
+#The estimated value for N is the estimate for its initial value at time zero
+#The standard deviation implies that not a single "fitting run" was done but
+#a whole series for which a mean and standard deviation could be computed
+#the t value is defined as the estimated value/standard deviation so a large
+#value means little variation relative to the mean obtained value 
+#the t value is subsequently used in a T table (student t test) to determine
+#the likelihood of this estimate not being correct
 
-#Answer:The error metric used during fitting is the sum of squares. If you square a small value, it becomes even smaller. That means that large discrepancies are weighed higher during fitting: you care more about 1 point being off a lot, than many points being off a little. To correct for this discrepancy, log puts these values on a more even footing.
+#Q2D
+#If parameters are strongly correlated it means that if the fitting procedure
+#obtains a higher value for one it does so too for the other, whereas in case of
+#anticorrelation a higher fitted value for one corresponds to a lower fitted value
+#for the other. The first may occur for e.g birth and death rates, same population
+#numbers may arise if birth and death are both low or both high. The latter may
+#occur for birth and immigration rates, same population numbers may occur if one
+#is high and the other low. The fact that parameters (anti)correlate means that
+#there is insufficient data to decide which of the possible pairs of values is 
+#the right one, so the model is underdetermined and one should consider collapsing
+#these parameters into a single net one.
+```
 
-Now you know some basics about using Grind. We wholeheartedly recommend you to read at least the first part of the tutorial/manual explaining the Grind functions here: https://tbb.bio.uu.nl/rdb/grindR/tutorial.pdf, especially if you have never worked with Grind/ODE integration at all before.
+```{r}
+#Q2E
+#here you can write code to do the same as above but now for the red strain in Fig 3B
+#make sure to look at both parameter values and fit statistics
+
+#Q2E answer
+#simply do the same as before for figure 3A, red strain:
+fig3RB <- read.csv(paste("Fig3/",exptB,"_R.csv",sep="")) # Red strain
+data3RB <- as.data.frame(cbind(fig3RB$Time,fig3RB$OD)); names(data3RB) <- c("time","N")
+fit3RBlog  <- fit(data3RB, state = s, odes = model, parms = p,
+               free=free, fun=log, lower=lower, pch=".",
+               legend=FALSE, tstep=0.1, main="Fig 3 b red monoculture (fun=log)",
+               ymin = 0, ymax = 1
+               )
+print(fit3RBlog$par)
+summary(fit3RBlog)
+#you see that a very large value of q0 is obtained, meaning that this delay fraction
+#is approximately equal to 1 from time is zero onwards, obliterating this startup phase
+#function's impact. 
+#however from the fit statistics summary we also see that there are issues with this fit:
+#covariances could not be estimated. So while at first sight it seems that the fitting itself can 
+#figure out there is no delay phase, these issues suggest that if you have information that certain 
+#processes and hence parameters are not relevant you should use that information and not try to fit 
+#q0 and m here
+```
 
 
-The below loads in all the data from the Ram paper and fits single growth curves using standard parameters and starting state. In this way, you easily have all data available. This data is in a list. You can look at sections of this list using `$` or `[["ListEntryName"]]`. As for the plots of the standard fits, note that unfortunately Grind's standard time plot uses a specific colour palette, one for each ODE to plot, and since we fit green and red separately it is not easily possible to make the colours green for the green bacteria.
+The below loads in all the data from Fig3 of the Ram paper(both their data and their fits). This data is in a list. You can look at sections of this list using $ or [[]]. This comes in handy when wanting to fit the model to multiple data sets at once. As for the plots of the standard fits, note that unfortunately Grind's standard time plot uses a specific colour palette, one for each ODE to plot, and since we fit green and red separately it is not easily possible to make the colours green for the green bacteria.
 
 ```{r}
 dataAndFitsFigureThree = readInDataFigureThreeRamPaper()
@@ -210,248 +160,66 @@ dataAndFitsFigureThree = readInDataFigureThreeRamPaper()
 head(dataAndFitsFigureThree$DataexptAFig3G)
 head(dataAndFitsFigureThree[["DataexptAFig3R"]])
 
-#up to you to fit the data for exptB for the red strain (so figure 3 B1 from the paper). Use the fit function (like we did above, be sure to use fun=log!) and dataAndFitsFigureThree$DataexptBFig3R for this. You can check to see if you did it correctly by comparing it to dataAndFitsFigureThree$FitexptBFig3R.
+```
+```{r}
+#Question 3
 
-
-##############
-# ANSWER
-##############
-lower <- rep(0, length(free)); lower[match("v",free)] <- 1; lower  # set lower bounds, v <1 not meaningful
-fit3RBlog  <- fit(dataAndFitsFigureThree$DataexptBFig3R, state = initialState, odes = model,
-                  parms = parametersForFitting, free=free, fun=log, lower=lower, pch=".",
-                  legend=FALSE, tstep=0.1, main="Fig 3 B1 red monoculture (fun=log)",
-                  ymin = 0, ymax = 1
-                  )
-#summary(fit3RBlog) --> this throws an error because the parameters are so dependent!
+#Q3A Given that the strains are the same but growing under different conditions intrinsic strain properties such as r, K and v are expected to be similar, whereas conditions dependent parameters such as q0 and m may likely differ
 ```
 
-q0 and m are lag phase parameters. It is clear in figure3 B1, B2, C3 and C3 of the paper that there is no lag phase. However, in our standard procedure we do fit those parameters. Does that work? Check the fits for the data from experiment B and C, and see what happens with these two parameters. What are the estimates, and why?
+#Q3B
+To do this, we need to tell the fit function of
+-What parameters to fit for all data together (free parameters)
+-What parameters to fit separately per dataset (different parameters).
+-Which data sets to use for fitting
 
 ```{r}
-#query the fits in the list above. You can just print them (especially their $par component that holds the fitted parameters), or print their summary()
-
-########
-#Answer
-########
-print("You can read the parameters from the print-out of the full list:")
-dataAndFitsFigureThree$FitexptBFig3R
-print("Or just look at the parameters:")
-dataAndFitsFigureThree$FitexptBFig3R$par
-
-#Uncomment these lines to see the summary that gives an error because covariances can't be calculated!
-
-#print("Or look at the summary, which gives a lot of warnings about the fitting of all these parameters not going well! :")
-#summary(dataAndFitsFigureThree$FitexptBFig3R)
+#set up initial state, and initial guess for parameter values
+s <- c(N=0.124)
+p <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+#all parameters are fitted
+free <- c("N",names(p)) 
+#define the parameters for which different values should be obtained from different data sets, for all other parameters a single fit value is obtained from the combined data sets
+differ <- c("q0", "m")
+#define the list of data sets to be fitted to
+l <- list(dataAndFitsFigureThree$DataexptAFig3G, dataAndFitsFigureThree$DataexptAFig3R)
 ```
-
-#answer: The fit is 'good' but parameters show that q0 goes extremely high. --> eliminates lag by making that fraction effectively zero. A huge q0 divided by a huge q0 + some small number is almost 1. Hence the lag phase portion of the formula (q0/(q0+e^(-mt))) is effectively removed. Also note that you get all sorts of warnings about covariance indicating that you can't separately fit all these parameters well. Basically, the fit is forcing the lag section of the equation to be ignored, which means you should take notice and not try to fit this for the bacteria not starting from the lag phase! 
-
-#See : https://stackoverflow.com/questions/50928796/system-is-computationally-singular-reciprocal-condition-number-in-r 
-#https://math.stackexchange.com/questions/889425/what-does-determinant-of-covariance-matrix-give 
-#https://stackoverflow.com/questions/34700685/calculate-the-inverse-of-a-matrix-system-is-computationally-singular-error 
-
-
-# Question 3 
-
-Until now, we have done pretty much as the authors did in Figure 3: produced separate fits for their separate datasets. However, we know that the bacteria in figure 3 A1 are the same as in figure 3 B1. Sure, one is starting from the stationary phase and one isn't, but other than that they are the same. So we know they differ in some respects but are the same in others, and we'd like to leverage that in our fitting. In other words: we'd like to fit certain parameters together (taking advantage of more data for doing that), while we want to let others differ (those we need to produce the separate behaviours, in this case the lag parameters).
-
-
-To do this, we need a way of telling Grind:
--What parameters to fit for all data together
--What to fit separately per dataset.
--Which data to use for fitting.
-
-To specify what parameters should be fit differently for the different datasets, you can use the differ parameter. This simply means that you set, for example, `differ = c("m", "v", "q0")` in the call to the fit function. Grind automatically understand that the parameters to fit together are all those which are not in the differ parameter. Finally, to use multiple data sets for fitting, you need to give a list of the datasets. In this case, that would be `list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptBFig3R)`. You need one more thing: we want to set the lower bound of v to 1. But now, we are fitting 2*the parameters that differ per dataset, + all those that don't for all data together. So we need some code to make sure that both v1 (for red) and v2 (for green) have a lower bound of 1. To do that, we use the following:
+As before we need to set the lower bound of v to 1. But now, we are fitting 2*the parameters that differ per dataset, + all those that don't for all data together. So we need some code to make sure that we set the right parameter to have a lower bound of 1. To do that, we use the following:
 
 ```{r}
-#set up state, parameters, and what to fit separately
-initialState  <- c(N=0.124)
-initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
-free <- c("N",names(initialParams))
-differ <- c("K", "v", "m")
-
-#the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted combined for the two datasets
+#the total number of parameters to fit = 2 * those in differ (as these need to be fitted twice, once
+#for each data set) + all remaining parameters in free that should be fitted combined for the two datasets
 totfree <- c(free[!(free %in% differ)], differ, differ)
 npar <- length(totfree)
 cat("Number of free parameters",npar)
 
-#Now set all instances of v in the total number of parameters to fit to 1, and all the other lower bounds to 0
+#Now set all instances of v in the total number of parameters to have a lower bound of1, and all the other lower bounds to 0
 lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
 ```
-
-
-Up to you to make fits of the red strain from A1 and red strain from B1 for experiment A and B combined. Use the code above together with fit and a list of the red A1 and red B1 dataset. Investigate what the result is if you let different parameters differ or not, and what that would mean biologically. Also compare the sum of squares of the residuals of the separate fits with these combined fits: do you do (much) worse, or better?
+Now do the combined fitting
 
 ```{r}
-#combinedFit = fit() #yours to fill in!
+fitq0mdiffer <- fit(data=l, free=free, differ=differ, fun=log, odes = model, state = s, parms = p, lower=lower, pch=".",legend=FALSE, tstep=0.1,  main="Red from A and B, q0 andd m differing", add=TRUE, ymin = 0, ymax = 1)
+summary(fitq0mdiffer)
+fitq0mdiffer$ssr
 
+#Q3B
+#In principle what we do here is better as we use more data (two data sets) to determine the same 
+#parameters (N,K,r,v), rather than determining these parameters twice from two different data sets
 
-#combinedFit$par #to see the fitted parameters
-#combinedFit$ssr #to get to the sum of squared residuals, for comparison with the original fits
-
-
-#######
-#Answer
-#######
-
-###
-### Differing in N, m, and q0
-###
-
-#set up state, parameters, and what to fit separately
-initialState  <- c(N=0.124)
-initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
-free          <- c("N",names(initialParams))
-differ        <- c("m", "q0", "N")
-
-#the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted together for the two datasets
-totfree <- c(free[!(free %in% differ)], differ, differ)
-npar    <- length(totfree)
-cat("Number of free parameters",npar)
-
-#set the lower bound to 0 for all, then to 1 for all instances of v
-lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
-
-
-fitNMQZeroDiffer <- fit(data=list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptBFig3R), 
-                    free=free, differ=differ, fun=log, odes = model, state = initialState,
-                    parms = initialParams, lower=lower, pch=".",legend=FALSE, tstep=0.1, 
-                    main="red A1 & red B1, N, m, and q0 differing", add=TRUE, ymin = 0, ymax = 1)
-#summary(fitKVMDiffer) --> gives an error of covariance. This is because of the lag phase parameters, which we allowed to be fitted in our call.
-fitNMQZeroDiffer$ssr
-
-
-#compare with original two fits separately:
-summary(dataAndFitsFigureThree$FitexptAFig3R)
-dataAndFitsFigureThree$FitexptAFig3R$ssr
-
-#summary(dataAndFitsFigureThree$FitexptBFig3R) --> #can't fit separately well. 
-dataAndFitsFigureThree$FitexptBFig3R$ssr
-
-#fit of the model with 2 datasets is only very minimally worse in ssr than the two separate
-#note: should of course add up the residuals of the fit of Red (A1) and Red (B1) separately for a fair comparison!
-differenceSSR = abs(fitNMQZeroDiffer$ssr-(dataAndFitsFigureThree$FitexptAFig3R$ssr + dataAndFitsFigureThree$FitexptBFig3R$ssr))
-print(paste0("Difference in ssr between fitted together with parameters: ", paste(differ, collapse = ", "), "differing : ", differenceSSR))
-
-
-
-#Note: you needn't have done all the below options. They're just all there for you to browse!
-#Note: the below diffSSR variables all contain the differences of the combined fit to the two separate fits of Red and Red data from figure 3 A1 and B1
-
-###
-### Differing only in K and N
-###
-
-#order of parameters from fit: first one is for red A1, second one for red B1
-resultKDiffOnlyRedRed  = fitExpt3WithDiffer(differ = c("K", "N"), mode = "redred")
-fitKDiffOnlyRedRed     = resultKDiffOnlyRedRed$fit
-diffSSRKDiffOnlyRedRed = resultKDiffOnlyRedRed$diffSSR
-
-#Here you assume that the two differ in carrying capacity only. That's a bit strange: they're the same bacterial strain. Not a very useful thing to test!
-
-###
-### Differing only in v and N --> doesn't work, fit goes way off the rails
-###
-
-#resultVDiffOnlyRedRed  = fitExpt3WithDiffer(differ = c("v", "N"), mode = "redred")
-#fitVDiffOnlyRedRed     = resultVDiffOnlyRedRed$fit
-#diffSSRVDiffOnlyRedRed = resultVDiffOnlyRedRed$diffSSR
-
-###
-### Differing only in m and N
-###
-
-resultMDiffOnlyRedRed  = fitExpt3WithDiffer(differ = c("m", "N"), mode = "redred")
-fitMDiffOnlyRedRed     = resultMDiffOnlyRedRed$fit
-diffSSRMDiffOnlyRedRed = resultMDiffOnlyRedRed$diffSSR
-
-#This or the one below seem to be the most logical choice in this case. Only one lag parameter need differ!
-
-###
-### Differing only in q0 and N
-###
-
-resultQZeroDiffOnlyRedRed  = fitExpt3WithDiffer(differ = c("q0", "N"), mode = "redred")
-fitQZeroDiffOnlyRedRed     = resultQZeroDiffOnlyRedRed$fit
-diffSSRQZeroDiffOnlyRedRed = resultQZeroDiffOnlyRedRed$diffSSR
-
-#This works just fine, as does the above!
-
-###
-### Differing in K and v and N --> doesn't work, numerical integration fails
-###
-
-#resultKVDiffRedRed  = fitExpt3WithDiffer(differ = c("K", "v", "N"), mode = "redred") #This doesn't work --> get errors!
-#fitKVDiffRedRed     = resultKVDiffRedRed$fit
-#diffSSRKVDiffRedRed = resultKVDiffRedRed$diffSSR
-
-
-###
-### Differing in v and m and N
-###
-
-resultVMDiffRedRed  = fitExpt3WithDiffer(differ = c("v", "m", "N"), mode = "redred")
-fitVMDiffRedRed     = resultVMDiffRedRed$fit
-diffSSRVMDiffRedRed = resultVMDiffRedRed$diffSSR
-
-###
-### Differing in K and m and N
-###
-
-resultKMDiffRedRed  = fitExpt3WithDiffer(differ = c("K", "m", "N"), mode = "redred")
-fitKMDiffRedRed     = resultKMDiffRedRed$fit
-diffSSRKMDiffRedRed = resultKMDiffRedRed$diffSSR
-
-###
-### Differing in q0, m and N: 
-###
-
-resultQZeroMDiffRedRed  = fitExpt3WithDiffer(differ = c("q0", "m", "N"), mode = "redred")
-fitQZeroMDiffRedRed     = resultQZeroMDiffRedRed$fit
-diffSSRQZeroMDiffRedRed = resultQZeroMDiffRedRed$diffSSR
-
-
+#Q3C
+#Still, we do have the issue we encountered earlier for the second data set, in which there is no lag #phase, that still trying to fit q0 and m to this data gives a high value of q0 and problems with
+#co-variances indicating this is not such a good idea.
+#So ideally, N,K,r and v should be fitted from both data sets, and q0 and m only for the first,
+#while not fitting these for the second data set.
 ```
-#Answer: all in all you see that only different N and q0 or m are fine. Only 2 different estimates, rather than 6! In this way we make much better use of the data than the authors did.
-
 
 # Question 4
 
-
-You've now fit the separate data and fit red and green together for experiment A. In the paper, what the authors do is say "Hey, if we first fit the separate growth curves, obtaining important parameters, and then grow the strains together to get data solely for fitting competition parameters (we already know the others from monoculture), we don't need frequency data!". This works well enough. However, in the end, they fit 14 parameters to their data: 12 from the separate monoculture (6 per strain), + 2 competition parameters. Are they not overfitting? To investigate, let's do two things:
-
-1. First fit the c1 and c2 parameters for  experiment A as the authors did it.
-2. Rather than fitting c1 and c2, see what happens if you fit with only only one c parameter.
-
-Let's start with one. You need to do the following:
-- Define the set of ODE equations for 2 variables. Copy the one from the beginning, and edit it to dN1 and dN2, renaming variables as needed.
-- Read in the data from experiment 4 (it is in the folder Fig4; called "2015-11-18_RG.csv" for experiment A)
-- Tell Grind to fit this to the data of experiment A for red and green strains, while saying that 12 parameters should not be estimated (you need to take these directly from the separate fits for red and green). Do this by:
-  - Setting `free = c(c1, c2)` in the `fit()` command. This tells Grind that it only needs to fit 2 parameters.
-  - Taking the fitted parameters from figure 3A1 and A2 (red and green), renaming the red ones to include a 1 at the end and the green ones to include a 2 (so they match your 2D ODE), and then combining those and adding c1 and c2 `combinedParams = c(params3ARed, params3AGreen, c1=1, c2=1)`. 
-  - Setting `tweak="nsol$OD=nsol$N1+nsol$N2"` in the `fit()` command. Look at the plot and make sure you understand what it does.
-  - Setting `upper=2` in the `fit()` command
-
-Hints:
--Be sure to rename all parameters.
--Assume that the initial concentrations of red and green in the mixed experiment are equal (that is, the initial state should be half the initial OD for N1, and half of it for N2)
--Be sure that the data is a data frame (not a tibble). This might cause errors with deSolve etc. otherwise
-
-
-
 ```{r}
+#Q4A: define the 2D model here
 
-
-
-
-#######
-#Answer
-#######
-
-#NOTE: the colours in the fit are a bit misleading, red = red bacteria strain, blue = green bacteria strain, green = total OD in the model.
-
-# The 2D model
-
+#Q4A answer
 model2 <- function(t, state, parms) {
   with(as.list(c(state,parms)), {
     a1 <- q01/(q01+exp(-m1*t)); a2 <- q02/(q02+exp(-m2*t))
@@ -460,52 +228,73 @@ model2 <- function(t, state, parms) {
     return(list(c(dN1,dN2)))  
   }) 
 }
+```
+Now let us read in the parameters as Ram et al. fitted them to figure 3A for the red and green strain
+and let us construct a parameter vector for the 2D model from this
 
-
-
-
-# Take the parameters from the single fits. Then rename to match model with 1 and 2.
+```{r}
+# Take the parameters from the single fits (we now use the fitted values obtained in the paper). 
+# Parameters are renamed, appending indices 1 and 2, respectively for the red (R) and green (G)
+# strains.
 pR        <- dataAndFitsFigureThree$FitexptAFig3R$par[2:length(dataAndFitsFigureThree$FitexptAFig3R$par)]
 names(pR) <- paste(names(pR),"1",sep="")
-
 pG        <- dataAndFitsFigureThree$FitexptAFig3G$par[2:length(dataAndFitsFigureThree$FitexptAFig3G$par)]
 names(pG) <- paste(names(pG),"2",sep="")
+#total parameter set to fit figure 4 is then pR+pG plus the competition parameters
+p4        <- c(pR,pG,c1=1,c2=1)
+```
+Next construct initial conditions for N1 and N2 from the optical density data representing N1+N2
 
-# Read in the data
+```{r}
+# Determine the initial conditions from the data: optical density at start
+# Assyne initially strains have equal frequency assigning half of OD to each.
 fig4Data  <- readr::read_csv("Fig4/2015-11-18_RG.csv")
 data4Fit  <- dplyr::bind_cols(fig4Data$Time, fig4Data$OD) %>% dplyr::rename(time = ...1, OD = ...2) %>% as.data.frame()
-
-# Set the initial state and fit
-p4        <- c(pR,pG,c1=1,c2=1)
 initialOD <- data4Fit[1,2]
-s4        <- c(N1=initialOD/2,N2=initialOD/2);s4  # assume the expt was started equally
+s4        <- c(N1=initialOD/2,N2=initialOD/2);s4
+```
+
+
+```{r}
+# Q4B Define which parameters are free to be fitted to the data of Fig4
+
+# Q4B answer: Note that this should be only the competition parameters
 free4     <- c("c1","c2")
+```
+
+
+```{r}
+#Q4C Write code to do the actual fitting
+
+#Q4C answer:
+#to do the fitting
 fit4      <- fit(data4Fit, odes=model2, tweak="nsol$OD=nsol$N1+nsol$N2",free=free4, parms = p4, state = s4,
              fun=log, lower=0, upper = 2, pch=".", legend=TRUE, tstep=0.1,
              main="Fig 4 fit using monoculture param estimates from fig3 R and G for expt A",
              ymin = 0, ymax = 1)
+#note the differences in line colors compared to the paper, unfortunately it is not easy to fix this.
+#note that we use the tweak: OD=N1+N2 to plot as extra the total density from N1 and N2 summed
 
+#to obtain parameter values and fit statistics
 summary(fit4)
 
+#in the curves you see N1 going up and N2 going down while in the fitting stats you see c1~0.6 and c2~2
+#this makes perfect sense: competition with your own species has no parameter, so it is scaled at 1
+#c2>1 means that N1 experiences more competition from N2 than from itself, so on its own it grows well, 
+#whereas c1<1 means that N2 experience more competition from itself than N1, so on its own it grows less well.
+#this causes N1 to outcompete N2
 
+#Results are quite shaky: the standard deviation for c2 is huge, and c1 and c2 are strongly anti-correlated #(meaning that if for one you obtain a higher than for the other you obtain a lower value) suggesting they
+#are strongly coupled.
+#This problem can be understood from the following: competition only becomes relevant once population levels get 
+#larger, and once strain1 has reached a sufficient level strain2 numbers have dropped already significantly #making it hard to estimate c2. 
 ```
 
-Question: interpret what c1 and c2 mean biologically. Do you trust this judgement? Look particularly at the standard error of the fitted c parameters.
-
-#Answer: the Red strain (c1) experiences ~4 times less competition from green (c2) than vice versa (i.e. red is more hindered by its own population than by green; while green is hindered about 2 times as much by red as by itself). However, don't be fooled: this seemingly valid biological knowledge is wrong, as the next question (and the extreme parameter correlation in this fit) show(s). Note also the huge standard error in c2: it is all over the place!
-
-
-Now on to part 2: fitting with just one c parameter. The way to do this is to simply change the model and make it have only one c parameter used in the equation for N1 and N2, rather than c1 and c2, and then rerunning the fit. Don't forget to change `free` and the initial parameters. After that's done, compare the `$ssr` property of the fit with 1 c and c1 and c2.
 
 ```{r}
+#Q4D redo the fitting for a 2D model with a single c parameter
 
-
-
-
-########
-#Answer
-########
-
+#Q4D answer:
 modelOneC <- function(t, state, parms) {
   with(as.list(c(state,parms)), {
     a1 <- q01/(q01+exp(-m1*t)); a2 <- q02/(q02+exp(-m2*t))
@@ -515,8 +304,6 @@ modelOneC <- function(t, state, parms) {
   }) 
 }
 
-
-# Set the initial state and fit
 p4OneC    <- c(pR,pG,c = 1)
 initialOD <- data4Fit[1,2]
 s4        <- c(N1=initialOD/2,N2=initialOD/2);s4  # assume the expt was started equally
@@ -528,173 +315,9 @@ fit4OneC  <- fit(data4Fit, odes=modelOneC, tweak="nsol$OD=nsol$N1+nsol$N2",free=
 
 summary(fit4OneC)
 
-
+#The fitted curves look very similar, and also the SSR is very similar (both ~4.22).
+#Interestingly the single fitted c value is very similar to the previously fitted c1 value
+#rather than in between the previous c1 and c2 value, supporting the idea that the c2
+#with its large standard deviation could not be trusted.
 ```
-
-Question: look at your results, both the fitted value of the c parameter and the (difference in) residual sum of squares. Do you think a single or 2 c parameters are the way to go here? Why?
-
-
-#Answer: You see that the estimate for c is almost exactly the same as it was before for c1. ~0.6022 versus ~0.5997. What gives? Well, this competition only comes into play late in the game: in reality, the first strain (red) grows much faster than second strain (green). Hence, c2 is not identifiable because green is basically gone by the time competition starts being a real pain (near carrying capacity), so the fit just guesses something arbitrarily. In other words: at first growth is not limited by competition, and when that starts being the case the green bacteria are already mostly gone. 
-
-#The sum of squared residuals is not meaningfully different from when there were 2 c parameters, so you can conclude that 1 c parameter is the way to go here!
-
-
-# Extra Question 5: Fitting red (A1) and green (A2) together:
-
-```{r}
-#set up state, parameters, and what to fit separately
-initialState  <- c(N=0.124)
-initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
-free <- c("N",names(initialParams))
-differ <- c("K", "v", "m")
-
-#the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted combined for the two datasets
-totfree <- c(free[!(free %in% differ)], differ, differ)
-npar <- length(totfree)
-cat("Number of free parameters",npar)
-
-#Now set all instances of v in the total number of parameters to fit to 1, and all the other lower bounds to 0
-lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
-```
-
-
-Up to you to make fits of the red and green data for experiment A combined. Use the code above together with fit and a list of the green and red dataset. Investigate what the result is if you let different parameters differ or not, and what that would mean biologically. Also compare the sum of squares of the residuals of the separate fits with these combined fits: do you do (much) worse, or better?
-
-```{r}
-#combinedFit = fit() #yours to fill in!
-
-
-#combinedFit$par #to see the fitted parameters
-#combinedFit$ssr #to get to the sum of squared residuals, for comparison with the original fits
-
-
-#######
-#Answer
-#######
-
-###
-### Differing in K, v and m
-###
-
-#set up state, parameters, and what to fit separately
-initialState  <- c(N=0.124)
-initialParams <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
-free          <- c("N",names(initialParams))
-differ        <- c("K", "v", "m")
-
-#the total number of parameters to fit = 2 * those in differ + all parameters in free that should be fitted together for the two datasets
-totfree <- c(free[!(free %in% differ)], differ, differ)
-npar    <- length(totfree)
-cat("Number of free parameters",npar)
-
-#set the lower bound to 0 for all, then to 1 for all instances of v
-lower <- rep(0,npar); lower[which(totfree == "v")] <- 1; lower  # set lower bounds
-
-
-fitKVMDiffer <- fit(data=list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptAFig3G), 
-                    free=free, differ=differ, fun=log, odes = model, state = initialState,
-                    parms = initialParams, lower=lower, pch=".",legend=FALSE, tstep=0.1, 
-                    main="red & green K, v and m differing", add=TRUE, ymin = 0, ymax = 1)
-summary(fitKVMDiffer)
-fitKVMDiffer$ssr
-
-#So, when fitting 3A while letting only K, v and m differ
-#3R (exptA) params:  K = 0.65; v = 1;   m = 2.48
-#3G (exptA) params:  K = 0.53; v = 1.4; m = 0.77 
-#qo and r and N (shared) : N = 0.12; q0 = 0.03; r = 0.61
-
-#compare with original two fits separately:
-summary(dataAndFitsFigureThree$FitexptAFig3R)
-dataAndFitsFigureThree$FitexptAFig3R$ssr
-#3R (exptA) : N = 0.13; K = 0.65; v = 1; m = 3.21; q0 = 0.01; r = 0.61
-
-summary(dataAndFitsFigureThree$FitexptAFig3G)
-dataAndFitsFigureThree$FitexptAFig3G$ssr
-#3G (exptA) : N = 0.12; K = 0.52; v = 3.1; m = 0.95; q0 = 0.03; r = 0.34
-
-#fit of the model with 2 datasets is only very minimally worse in ssr than the two separate
-#note: should of course add up the residuals of the fit of Red and Green separately for a fair comparison!
-differenceSSR = abs(fitKVMDiffer$ssr-(dataAndFitsFigureThree$FitexptAFig3R$ssr + dataAndFitsFigureThree$FitexptAFig3G$ssr))
-print(paste0("Difference in ssr between fitted together with parameters: ", paste(differ, collapse = ", "), "differing : ", differenceSSR))
-
-
-
-#Note: you needn't have done all the below options. They're just all there for you to browse!
-#Note: the below diffSSR variables all contain the differences of the combined fit to the two separate fits of R and G data from figure 3 A1 and A2
-
-###
-### Differing only in K
-###
-
-#order of parameters from fit: first one is for red, second one for green
-resultKDiffOnly  = fitExpt3AWithDiffer(differ = c("K"))
-fitKDiffOnly     = resultKDiffOnly$fit
-diffSSRKDiffOnly = resultKDiffOnly$diffSSR
-
-#Here you assume that the two differ in carrying capacity only. As the image of the fit shows, and as you could have predicted, that doesn't work out. It is clear these strains also differ in their lag phase parameters!
-
-###
-### Differing only in v
-###
-
-resultVDiffOnly  = fitExpt3AWithDiffer(differ = c("v"))
-fitVDiffOnly     = resultVDiffOnly$fit
-diffSSRVDiffOnly = resultVDiffOnly$diffSSR
-
-###
-### Differing only in m
-###
-
-resultMDiffOnly  = fitExpt3AWithDiffer(differ = c("m"))
-fitMDiffOnly     = resultMDiffOnly$fit
-diffSSRMDiffOnly = resultMDiffOnly$diffSSR
-
-###
-### Differing in K and v
-###
-
-resultKVDiff  = fitExpt3AWithDiffer(differ = c("K", "v"))
-fitKVDiff     = resultKVDiff$fit
-diffSSRKVDiff = resultKVDiff$diffSSR
-
-#This already works better, but still looks very off. Clearly, only carrying capacity and decelaration are not enough.
-
-###
-### Differing in v and m
-###
-
-resultVMDiff  = fitExpt3AWithDiffer(differ = c("v", "m"))
-fitVMDiff     = resultVMDiff$fit
-diffSSRVMDiff = resultVMDiff$diffSSR
-
-###
-### Differing in K and m
-###
-
-resultKMDiff  = fitExpt3AWithDiffer(differ = c("K", "m"))
-fitKMDiff     = resultKMDiff$fit
-diffSSRKMDiff = resultKMDiff$diffSSR
-
-#This actually already gives a very good fit. Slightly better than v and m. In fact, compared to all three parameters differing:
-
-diffKVMKMFitSSR = abs(fitKVMDiffer$ssr - fitKMDiff$ssr)
-cat("\n")
-print(paste("Difference between fit with separate parameter estimation of K, v, and m versus that with only K and M fitted separately:", diffKVMKMFitSSR))
-
-
-
-#In sum, you'd think that either only letting K, v and m, or even only K and m (barely a difference then) differ between red and green in experiment a and fitting the data together would be best. You can do with equal q0, r, and N.
-```
-
-
-
-
-
-
-
-
-
-
-
-
 
