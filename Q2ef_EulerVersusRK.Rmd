@@ -10,6 +10,7 @@ output: html_notebook
 if(!require(pacman)) {
   install.packages("pacman"); require(pacman)}
 p_load(tidyverse, cowplot, deSolve)
+source("Practical Fitting Ram et al Data/grind.R")
 ```
 
 Defining the model:
@@ -83,7 +84,8 @@ ggplot(aes(x = time, y = R, colour = method)) +
   theme_bw() +
   # we set the left and right margins to 0 to remove 
   # unnecessary spacing in the final plot arrangement.
-  theme(plot.margin = margin(6, 0, 6, 0))
+  theme(plot.margin = margin(6, 0, 6, 0)) +
+  geom_line( size = 1.2)
 
 Bplot = dataFramePlotsEulerVsRK %>%
   ggplot(aes(x = time, y = B, colour = method)) +
@@ -92,7 +94,8 @@ Bplot = dataFramePlotsEulerVsRK %>%
   scale_y_continuous(trans = "log",
                      breaks = c(2, 20, 200, 2000, 20000, 200000, 2000000, 20000000, 200000000, 2000000000)
                      ) +
-  theme(plot.margin = margin(6, 0, 6, 0))
+  theme(plot.margin = margin(6, 0, 6, 0)) +
+  geom_line( size = 1.2)
 
 legend = get_legend(
   # create some space to the left of the legend
@@ -171,7 +174,8 @@ ggplot(aes(x = time, y = R, colour = method)) +
   theme_bw() +
   # we set the left and right margins to 0 to remove 
   # unnecessary spacing in the final plot arrangement.
-  theme(plot.margin = margin(6, 0, 6, 0))
+  theme(plot.margin = margin(6, 0, 6, 0)) +
+  geom_line( size = 1.2)
 
 Bplot = dataFramePlotsEulerVsRK %>%
   ggplot(aes(x = time, y = B, colour = method)) +
@@ -180,7 +184,8 @@ Bplot = dataFramePlotsEulerVsRK %>%
   #scale_y_continuous(trans = "log",
   #                   breaks = c(2, 20, 200, 2000, 20000, 200000, 2000000, 20000000, 200000000, 2000000000)
   #                   ) +
-  theme(plot.margin = margin(6, 0, 6, 0))
+  theme(plot.margin = margin(6, 0, 6, 0)) +
+  geom_line( size = 1.2)
 
 legend = get_legend(
   # create some space to the left of the legend
