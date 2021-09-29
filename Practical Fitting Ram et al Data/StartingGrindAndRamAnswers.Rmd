@@ -1,0 +1,76 @@
+---
+title: "Getting started with Ram model and Grind"
+output: html_notebook
+---
+
+First we need to source the file grind.R which is a wrapper made around the deSolve, rootSolve etc packages 
+```{r}
+#loading required packages and sourcing Grind
+if(!require(pacman)) {
+install.packages("pacman"); require(pacman)}
+p_load(tidyverse, rootSolve, deSolve, FME)
+source("grind.R")
+```
+
+Below we define a function called model in a format appropriate for deSolve and Grind.
+This function can be used to calculate the values of the differential equation dN at different time points through numerical integration. As arguments it uses t (for a vector of time points), state (for a vector containing the initial state of the variables in the system), and parms (for a vector containing the values of the parameters of the system). State and parameters should be named vectors.
+
+The with(as.list(c(state, parms))) does nothing more than make these names available without having to write parms["v"] every time you want to use v from the parameters vector, and parms["q0"] every time you want to use q0.
+
+```{r}
+model <- function(t, state, parms) {
+  with(as.list(c(state,parms)), {
+    a <- q0/(q0+exp(-m*t))
+    dN <- r*a*N*(1-(N/K)^v)
+    return(list(dN))  
+  }) 
+}
+```
+
+below we specify the vector p with parameter values
+```{r}
+p <- c(K=0.6,r=0.4,m=2,q0=0.005,v=2)
+```
+
+next we specify the vector s with inital state of the variables
+```{r}
+s <- c(N = 0.124) #units are OD.
+```
+
+now we are going to numerically integrate the model, specifying the time interval, timestep of integration, initial state, parameter values and which model to solve
+```{r}
+run(tmax = 100, tstep = 1,
+    state = s,
+    parms = p,
+    odes = model
+    )
+#Q1A&B answer:
+#-if you change the parameters, r,K and v the delay function does not change, but population dynamics does: larger r also causes population to reach equilibrium faster, larger K results in higher equilibrium value, higher v causes a more rapid transition to equilibrium values.
+```
+Now we wanted to study this startup function:
+Note that we do not simply write q0 and m, but access them through the parameter list
+```{r}
+#Q1C answer:
+#function for q0/q0+e^(-m*t)
+fDelay <- function(t, params = p) {params["q0"]/(params["q0"]+exp(-params["m"]*t))}
+
+#make sure to give it a vector of times
+times = seq(1, 100, 0.5)
+output = fDelay(times)
+dataFDelay = data.frame(time = times, output = output)
+ggplot(dataFDelay, aes(x = time, y = output)) +
+  geom_point(size = 2) +
+  ggtitle("Delay equation values over time") +
+  geom_line(size = 0.5)
+
+#Q1D
+# this function starts at q0/(q0+1) at time zero, which is small if q0 is small, and approaches 1 as time #progresses because of e^{-mt} going to zero. 
+# the function thus ensures that effective growth rate is initially modulated by a factor smaller than 1, causing
+# it to initially be lower; later on it is multiplied by 1 enabling maximum growth 
+# if you change q0 from 0.005 to 0.5 or m from 2 to 20 this delay function approaches 1 earlier, for much smaller time values, this causes the population to reach its maximum growth speed and final stable size (much) faster.
+
+```
+
+
+
+```{r}
