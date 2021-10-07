@@ -105,7 +105,7 @@ Now look at fitting statistics
 The below loads in all the data from Fig3 of the Ram paper(both their data and their fits). This data is in a list. You can look at sections of this list using $ or [[]]. This comes in handy when wanting to fit the model to multiple data sets at once. As for the plots of the standard fits, note that unfortunately Grind's standard time plot uses a specific colour palette, one for each ODE to plot, and since we fit green and red separately it is not easily possible to make the colours green for the green bacteria.
 
 ```{r}
-source("HelperFunctionsAnswerFile.R")
+source("../HelperFunctionsAnswerFile.R")
 dataAndFitsFigureThree = readInDataFigureThreeRamPaper()
 
 #you can access the data using either $ or [[]]:
