@@ -182,7 +182,7 @@ free <- c("N",names(p))
 #define the parameters for which different values should be obtained from different data sets, for all other parameters a single fit value is obtained from the combined data sets
 differ <- c("q0", "m")
 #define the list of data sets to be fitted to
-l <- list(dataAndFitsFigureThree$DataexptAFig3G, dataAndFitsFigureThree$DataexptAFig3R)
+l <- list(dataAndFitsFigureThree$DataexptAFig3R, dataAndFitsFigureThree$DataexptBFig3R)
 ```
 As before we need to set the lower bound of v to 1. But now, we are fitting 2*the parameters that differ per dataset, + all those that don't for all data together. So we need some code to make sure that we set the right parameter to have a lower bound of 1. To do that, we use the following:
 
